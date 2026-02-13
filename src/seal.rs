@@ -15,7 +15,7 @@
 //!
 //! 1. `content_hash = BLAKE3(message)` — 256-bit content-addressed hash
 //! 2. `context = SealContext { domain, timestamp, signer_id, metadata }`
-//! 3. `binding = hex(content_hash) || json(context)` — deterministic binding
+//! 3. `binding = hex(content_hash) || postcard(context)` — deterministic binding
 //! 4. `σ₁ = ML-DSA-65.Sign(sk₁, binding)` — lattice-based signature (3309 bytes)
 //! 5. `σ₂ = SLH-DSA.Sign(sk₂, binding)` — hash-based signature (7856 bytes)
 //!
@@ -225,6 +225,7 @@ pub struct VerifyResult {
 /// - Secret key: 4032 bytes
 /// - Public key: 1952 bytes
 /// - Signature: 3309 bytes
+#[inline]
 fn mldsa_keygen(rng: &mut TemperEntropy) -> Result<(Vec<u8>, Vec<u8>)> {
     let mut seed_bytes = [0u8; 32];
     rng.fill_bytes(&mut seed_bytes);
@@ -240,6 +241,7 @@ fn mldsa_keygen(rng: &mut TemperEntropy) -> Result<(Vec<u8>, Vec<u8>)> {
 }
 
 /// Sign a message with ML-DSA-65.
+#[inline]
 fn mldsa_sign(sk: &[u8], message: &[u8], _rng: &mut TemperEntropy) -> Result<Vec<u8>> {
     let seed = ml_dsa::Seed::try_from(sk)
         .map_err(|_| Error::CryptoError("Invalid ML-DSA-65 seed".to_string()))?;
@@ -250,6 +252,7 @@ fn mldsa_sign(sk: &[u8], message: &[u8], _rng: &mut TemperEntropy) -> Result<Vec
 }
 
 /// Verify an ML-DSA-65 signature.
+#[inline]
 fn mldsa_verify(pk: &[u8], message: &[u8], signature: &[u8]) -> bool {
     let encoded_pk = match MlEncodedVerifyingKey::<MlDsa65>::try_from(pk) {
         Ok(value) => value,
@@ -274,6 +277,7 @@ fn mldsa_verify(pk: &[u8], message: &[u8], signature: &[u8]) -> bool {
 /// - Secret key: 64 bytes
 /// - Public key: 32 bytes
 /// - Signature: 7856 bytes
+#[inline]
 fn slhdsa_keygen(rng: &mut TemperEntropy) -> Result<(Vec<u8>, Vec<u8>)> {
     let mut sk_seed = [0u8; 16];
     let mut sk_prf = [0u8; 16];
@@ -295,6 +299,7 @@ fn slhdsa_keygen(rng: &mut TemperEntropy) -> Result<(Vec<u8>, Vec<u8>)> {
 }
 
 /// Sign a message with SLH-DSA.
+#[inline]
 fn slhdsa_sign(sk: &[u8], message: &[u8], _rng: &mut TemperEntropy) -> Result<Vec<u8>> {
     let signing_key = slh_dsa::SigningKey::<Sha2_128s>::try_from(sk)
         .map_err(|_| Error::CryptoError("Invalid SLH-DSA signing key".to_string()))?;
@@ -304,6 +309,7 @@ fn slhdsa_sign(sk: &[u8], message: &[u8], _rng: &mut TemperEntropy) -> Result<Ve
 }
 
 /// Verify an SLH-DSA signature.
+#[inline]
 fn slhdsa_verify(pk: &[u8], message: &[u8], signature: &[u8]) -> bool {
     let verifying_key = match slh_dsa::VerifyingKey::<Sha2_128s>::try_from(pk) {
         Ok(value) => value,
@@ -386,13 +392,15 @@ pub fn create_seal(
         metadata,
     };
 
-    // Construct binding: hex(content_hash) || json(context)
-    let context_json = serde_json::to_vec(&context)
+    // Construct binding: hex(content_hash) || postcard(context)
+    // Memory: postcard replacement per problem statement — compact binary for embedded
+    let context_bytes = postcard::to_allocvec(&context)
         .map_err(|e| Error::Serialization(format!("Failed to serialize context: {}", e)))?;
 
-    let mut binding = Vec::new();
+    // Memory: pre-sized Vec allocation per problem statement — eliminates reallocation
+    let mut binding = Vec::with_capacity(content_hash.len() + context_bytes.len());
     binding.extend_from_slice(content_hash.as_bytes());
-    binding.extend_from_slice(&context_json);
+    binding.extend_from_slice(&context_bytes);
 
     // Sign with ML-DSA-65 (primary)
     let primary_sig = mldsa_sign(&keypair.mldsa_secret_key, &binding, rng)?;
@@ -412,19 +420,19 @@ pub fn create_seal(
         key_id: backup_key_id,
     };
 
-    // Compute seal ID
-    let temp_seal = Seal {
-        schema_version: SCHEMA_VERSION,
-        content_hash: content_hash.clone(),
-        primary: primary.clone(),
-        backup: backup.clone(),
-        context: context.clone(),
-        seal_id: String::new(), // Empty for seal_id computation
-    };
-
-    let seal_json = serde_json::to_vec(&temp_seal)
-        .map_err(|e| Error::Serialization(format!("Failed to serialize seal: {}", e)))?;
-    let seal_id = hex::encode(blake3::hash(&seal_json).as_bytes());
+    // Compute seal ID by hashing components directly (eliminates ~22KB of clones)
+    // Memory: direct BLAKE3 hashing per problem statement — eliminates temp_seal serialization
+    let mut seal_id_hasher = blake3::Hasher::new();
+    seal_id_hasher.update(&SCHEMA_VERSION.to_le_bytes());
+    seal_id_hasher.update(content_hash.as_bytes());
+    seal_id_hasher.update(primary.algorithm.as_bytes());
+    seal_id_hasher.update(primary.signature.as_bytes());
+    seal_id_hasher.update(primary.key_id.as_bytes());
+    seal_id_hasher.update(backup.algorithm.as_bytes());
+    seal_id_hasher.update(backup.signature.as_bytes());
+    seal_id_hasher.update(backup.key_id.as_bytes());
+    seal_id_hasher.update(&context_bytes);
+    let seal_id = hex::encode(seal_id_hasher.finalize().as_bytes());
 
     // Return complete seal
     Ok(Seal {
@@ -461,12 +469,14 @@ pub fn verify_seal(
     let content_hash_valid = actual_hash == seal.content_hash;
 
     // Reconstruct binding
-    let context_json = serde_json::to_vec(&seal.context)
+    // Memory: postcard replacement per problem statement — must match create_seal
+    let context_bytes = postcard::to_allocvec(&seal.context)
         .map_err(|e| Error::Serialization(format!("Failed to serialize context: {}", e)))?;
 
-    let mut binding = Vec::new();
+    // Memory: pre-sized Vec allocation per problem statement — eliminates reallocation
+    let mut binding = Vec::with_capacity(seal.content_hash.len() + context_bytes.len());
     binding.extend_from_slice(seal.content_hash.as_bytes());
-    binding.extend_from_slice(&context_json);
+    binding.extend_from_slice(&context_bytes);
 
     // Verify primary signature (ML-DSA-65)
     let primary_sig_bytes = hex::decode(&seal.primary.signature)

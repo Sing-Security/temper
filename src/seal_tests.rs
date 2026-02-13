@@ -126,7 +126,8 @@ mod tests {
         // This test doesn't require PQC primitives
 
         // -- Setup & Fixtures
-        use serde_json;
+        // Memory: postcard replacement per problem statement
+        use postcard;
 
         // Create a seal manually with hardcoded fields
         let seal = Seal {
@@ -153,11 +154,32 @@ mod tests {
         };
 
         // -- Exec
-        let seal_json1 = serde_json::to_vec(&seal).unwrap();
-        let seal_id1 = hex::encode(blake3::hash(&seal_json1).as_bytes());
+        // Memory: updated to match new seal_id computation in create_seal
+        let mut hasher1 = blake3::Hasher::new();
+        hasher1.update(&seal.schema_version.to_le_bytes());
+        hasher1.update(seal.content_hash.as_bytes());
+        hasher1.update(seal.primary.algorithm.as_bytes());
+        hasher1.update(seal.primary.signature.as_bytes());
+        hasher1.update(seal.primary.key_id.as_bytes());
+        hasher1.update(seal.backup.algorithm.as_bytes());
+        hasher1.update(seal.backup.signature.as_bytes());
+        hasher1.update(seal.backup.key_id.as_bytes());
+        let context_bytes1 = postcard::to_allocvec(&seal.context).unwrap();
+        hasher1.update(&context_bytes1);
+        let seal_id1 = hex::encode(hasher1.finalize().as_bytes());
 
-        let seal_json2 = serde_json::to_vec(&seal).unwrap();
-        let seal_id2 = hex::encode(blake3::hash(&seal_json2).as_bytes());
+        let mut hasher2 = blake3::Hasher::new();
+        hasher2.update(&seal.schema_version.to_le_bytes());
+        hasher2.update(seal.content_hash.as_bytes());
+        hasher2.update(seal.primary.algorithm.as_bytes());
+        hasher2.update(seal.primary.signature.as_bytes());
+        hasher2.update(seal.primary.key_id.as_bytes());
+        hasher2.update(seal.backup.algorithm.as_bytes());
+        hasher2.update(seal.backup.signature.as_bytes());
+        hasher2.update(seal.backup.key_id.as_bytes());
+        let context_bytes2 = postcard::to_allocvec(&seal.context).unwrap();
+        hasher2.update(&context_bytes2);
+        let seal_id2 = hex::encode(hasher2.finalize().as_bytes());
 
         // -- Check
         assert_eq!(
@@ -173,7 +195,8 @@ mod tests {
         // This test doesn't require PQC primitives
 
         // -- Setup & Fixtures
-        use serde_json;
+        // Memory: postcard replacement per problem statement
+        use postcard;
 
         let original_seal = Seal {
             schema_version: 1,
@@ -199,8 +222,8 @@ mod tests {
         };
 
         // -- Exec
-        let json = serde_json::to_string(&original_seal).unwrap();
-        let deserialized_seal: Seal = serde_json::from_str(&json).unwrap();
+        let bytes = postcard::to_allocvec(&original_seal).unwrap();
+        let deserialized_seal: Seal = postcard::from_bytes(&bytes).unwrap();
 
         // -- Check
         assert_eq!(

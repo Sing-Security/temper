@@ -13,7 +13,7 @@ doctest = false
 
 [features]
 default = ["std"]
-std = ["alloc", "blake3/std", "serde_json/std", "hex/std"]
+std = ["alloc", "blake3/std", "hex/std"]
 alloc = []
 
 [dependencies]
@@ -31,7 +31,7 @@ getrandom = { version = "0.2", default-features = false }
 
 # -- Serialization
 serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
-serde_json = { version = "1", default-features = false, features = ["alloc"] }
+postcard = { version = "1", default-features = false, features = ["alloc"] }
 
 # -- Concurrency (no_std spinlock)
 spin = "0.9"
@@ -47,3 +47,10 @@ derive_more = { version = "2", default-features = false, features = ["from", "di
 
 [dev-dependencies]
 rand = "0.8"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
