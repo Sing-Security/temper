@@ -14,7 +14,6 @@ mod tests {
     // region:    --- Integration Tests (Ignored until PQC wired)
 
     #[test]
-    #[ignore] // Remove ignore once ML-DSA and SLH-DSA are wired
     fn test_seal_roundtrip() {
         // Property: Sign and verify should produce valid=true for correct inputs
 
@@ -51,7 +50,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Remove ignore once ML-DSA and SLH-DSA are wired
     fn test_seal_detects_content_tamper() {
         // Property: Tampering with content should invalidate the seal
 
@@ -84,7 +82,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Remove ignore once ML-DSA and SLH-DSA are wired
     fn test_seal_rejects_wrong_key() {
         // Property: Verifying with wrong public key should fail
 
