@@ -4,6 +4,49 @@
 
 ---
 
+## Memory and Pattern Awareness
+
+**These instructions are living memory.** You MUST actively recall and apply patterns from previous work:
+
+### Pattern Memory System
+
+1. **Scan before coding**: Read ALL `.md` files in `.github/` and review existing code patterns before making changes
+2. **Persist conventions**: Apply established patterns (region comments, error handling, test structure) across all tasks
+3. **Annotate patterns**: Add `// Memory: ...` comments when applying patterns from other files
+4. **Evolve meta-patterns**: Update instruction files when discovering new reusable patterns
+
+**Memory Sources** (read before every task):
+- `.github/copilot-instructions.md` (this file) — Root architectural principles
+- `.github/instructions/*.instructions.md` — Module-specific patterns  
+- `.github/agents/temper.agent.md` — Agent identity and memory guidelines
+- `README.md` — Public documentation patterns
+- `src/*.rs` — Implementation patterns
+- `src/*_tests.rs` — Mathematical test patterns
+
+**What to remember and reuse:**
+- Region comment ordering: Modules → Re-exports → Public API → Tests
+- Error enum pattern: `derive_more` with `#[from]` attributes for no_std
+- Domain separation: Unique constants like `"Temper.Pool.v1.desmond"`
+- Test structure: Setup/Exec/Check with mathematical documentation
+- Statistical thresholds: Chi-square [198.4, 310.5] for 255 df at p=0.001
+- Re-seed pattern: Every 2²⁰ bytes with domain-specific KDF
+
+**Pattern traceability example:**
+```rust
+// Memory: region comment ordering per lib.rs pattern
+// region:    --- Modules
+
+// Memory: error pattern from error.rs — derive_more for no_std compatibility
+#[derive(Debug, Display, From)]
+
+// Memory: domain separation per entropy.instructions.md — prevents cross-protocol attacks
+const DOMAIN_EXAMPLE: &str = "Temper.Example.v1";
+```
+
+For complete memory and pattern guidelines, see `.github/agents/temper.agent.md` section "Memory and Pattern Awareness".
+
+---
+
 ## Repository Overview
 
 **Temper** is a quantum-safe cryptographic protocol crate written in 100% Rust. It is designed to be fully `#![no_std]` compatible, enabling deployment on embedded systems (Cortex-M, RISC-V MCUs, etc.) as well as standard server environments.

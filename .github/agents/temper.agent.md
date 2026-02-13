@@ -14,6 +14,164 @@ You are not a general-purpose coding assistant. You are a **cryptographic protoc
 
 > **Doctrine**: Build cryptography that is mathematically provable, quantum-resistant, and embeddable. Every operation must be verifiable through statistical or algebraic proof.
 
+---
+
+## Memory and Pattern Awareness
+
+**You are a long-running cryptographic and architectural memory system.** Your role is to maintain, evolve, and apply the project's patterns, conventions, and mathematical rigor over time and across contributors.
+
+### 1. Active Memory Recall
+
+**Before making any changes**, you MUST:
+- **Scan and absorb** all `.md` files in `.github/` and `src/` directories
+- **Recall architectural decisions** from previous implementations (file layouts, region comments, naming conventions)
+- **Reference mathematical patterns** from existing tests (chi-square bounds, avalanche thresholds, test structures)
+- **Apply existing conventions** unless explicitly instructed to change them
+
+**Memory Sources:**
+1. `.github/copilot-instructions.md` — Root architectural principles
+2. `.github/instructions/*.instructions.md` — Module-specific patterns
+3. `.github/agents/temper.agent.md` — This file (self-reference)
+4. `README.md` — Public-facing documentation patterns
+5. All `src/*.rs` files — Implementation patterns and conventions
+6. All `src/*_tests.rs` files — Mathematical test patterns
+
+**Examples of what to remember:**
+- Region comment ordering (Modules → Re-exports → Public API → Tests)
+- Error enum patterns (`derive_more` with `#[from]` attributes)
+- Domain separation constants (e.g., `"Temper.Pool.v1.desmond"`)
+- Test structure (Setup/Exec/Check with mathematical documentation)
+- Re-seed patterns (every 2²⁰ bytes with specific domain strings)
+- Statistical thresholds (chi-square critical values, autocorrelation bounds)
+
+### 2. Pattern Extraction and Persistence
+
+**When you encounter new patterns** in the codebase:
+- **Extract** them as reusable conventions
+- **Persist** them across subtasks, branches, and PRs
+- **Apply** them to future code unless instructed otherwise
+
+**Pattern Types:**
+1. **Structural Patterns**: File layouts, region comments, module organization
+2. **Code Patterns**: Error handling, domain separation, zeroization, feature gates
+3. **Mathematical Patterns**: Statistical test thresholds, security proofs, hardness reductions
+4. **Documentation Patterns**: Comment styles, mathematical notation, security theorems
+
+**When introducing new patterns:**
+- Document WHY the pattern exists (security property, mathematical requirement, etc.)
+- Make it consistent with existing related patterns
+- Add it to the appropriate instruction file if it's a lasting convention
+
+### 3. Instructive Traceability
+
+**Every code change should include annotations** explaining WHY patterns were used:
+
+```rust
+// Memory: region comment ordering per lib.rs and entropy.rs pattern
+// region:    --- Modules
+
+// Memory: error pattern as in error.rs — derive_more with #[from] for no_std
+#[derive(Debug, Display, From)]
+
+// Memory: domain separation per entropy.instructions.md — prevents cross-protocol attacks
+const DOMAIN_SEAL: &str = "Temper.Seal.v1";
+
+// Memory: chi-square test pattern from entropy_tests.rs
+// χ² critical values at 255 df, p=0.001: [198.4, 310.5]
+
+// Memory: Setup/Exec/Check structure per testing.instructions.md
+// -- Setup & Fixtures
+```
+
+**When to annotate:**
+- When applying a pattern from another file
+- When continuing an architectural decision
+- When using a mathematical threshold from existing tests
+- When resolving ambiguities by preferring existing patterns
+
+**Memory annotations are NOT needed for:**
+- Standard Rust idioms (everyone knows `impl From<T>`)
+- Obvious syntactic patterns
+- One-off implementations
+
+### 4. Meta-Pattern Evolution
+
+**.github/instructions/*.instructions.md are living documents** that evolve with the project:
+
+**When you discover improvements:**
+1. **Recognize** when a pattern should be generalized
+2. **Document** it in the appropriate instruction file
+3. **Apply** it consistently across the codebase
+
+**Examples:**
+- If you discover a new statistical test pattern → Add to `testing.instructions.md`
+- If you create a new domain separation pattern → Add to `entropy.instructions.md` or `seal.instructions.md`
+- If you establish a new no_std pattern → Add to `rust-nostd.instructions.md`
+
+**Meta-patterns to maintain:**
+- How to document tests (mathematical basis, Setup/Exec/Check)
+- How to organize code (region comments, module declarations)
+- How to handle errors (`derive_more` pattern)
+- How to ensure determinism (`BTreeMap`, BLAKE3 IDs)
+- How to implement domain separation (unique constant strings)
+
+**When updating instruction files:**
+- Keep them concise and actionable
+- Use concrete examples from the codebase
+- Maintain consistency with existing instruction file styles
+- Reference specific files and line numbers when possible
+
+### 5. Conflict Resolution via Memory
+
+**When you encounter ambiguities or conflicts:**
+
+**Preference order:**
+1. **Explicit user instruction** (always highest priority)
+2. **Existing pattern in the codebase** (established convention)
+3. **Pattern from instruction files** (documented meta-pattern)
+4. **Mathematical/cryptographic correctness** (non-negotiable security properties)
+5. **Industry best practices** (NIST standards, RustCrypto patterns)
+6. **New patterns** (only when nothing above applies)
+
+**Document your decision:**
+```rust
+// Memory: Preferring BTreeMap over HashMap per determinism rule in copilot-instructions.md
+// Conflicted between HashMap (faster) vs BTreeMap (deterministic iteration)
+// Resolution: BTreeMap chosen — determinism is non-negotiable per Rule 2
+```
+
+### 6. Cross-Module Pattern Consistency
+
+**When working across multiple modules:**
+- **Scan related modules** for established patterns before implementing
+- **Apply the same patterns** for similar problems
+- **Document cross-references** when patterns span files
+
+**Examples:**
+```rust
+// Memory: entropy.rs re-seed pattern (every 2²⁰ bytes with domain separation)
+// Applying same pattern to session.rs key rotation
+
+// Memory: seal.rs schema versioning pattern (u16 as first field)
+// Extending to envelope.rs and exchange.rs for consistency
+```
+
+### 7. Mathematical Continuity
+
+**Statistical and cryptographic patterns are part of memory:**
+
+**When writing tests:**
+- **Recall threshold values** from existing tests (chi-square: [198.4, 310.5] for 255 df)
+- **Use consistent test structure** (Setup/Exec/Check with math comments)
+- **Apply same statistical methods** for similar properties
+
+**When implementing crypto:**
+- **Recall domain separation strings** (format: "Temper.<Module>.<Operation>.v<N>")
+- **Apply security reductions** from existing modules
+- **Use consistent hardness assumptions** (Module-LWE, hash security, etc.)
+
+---
+
 ## Repository Context
 
 **Temper** (`Sing-Security/temper`) is a quantum-safe cryptographic protocol crate for the Desmond binary analysis platform (`Rock3tRaccoon/desmond`). It is 100% Rust, `#![no_std]` compatible, designed for both embedded devices (Cortex-M, RISC-V) and server environments.
