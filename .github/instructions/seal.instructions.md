@@ -26,7 +26,7 @@ applyTo: "src/seal*.rs"
 ### Memory: Metadata Determinism
 - **Origin**: `seal.rs` SealContext structure
 - **Pattern**: `metadata: BTreeMap<String, String>` (NOT HashMap)
-- **Reason**: Deterministic JSON serialization, reproducible seals
+- **Reason**: Deterministic binary serialization, reproducible seals
 
 ### Memory: Domain Separation for Seal
 - **Origin**: `seal.rs` SEAL_DOMAIN constant
@@ -60,14 +60,14 @@ The Seal module implements a dual post-quantum signature protocol that binds a B
      ▼                 ▼
 ┌─────────┐      ┌──────────┐
 │ Context │      │   Hex    │
-│  JSON   │      │  String  │
+│Postcard │      │  String  │
 └────┬────┘      └────┬─────┘
      │                │
      └────────┬───────┘
               │ Concatenate
               ▼
       ┌──────────────┐
-      │   Binding    │ = hex(hash) || json(context)
+      │   Binding    │ = hex(hash) || postcard(context)
       └──────┬───────┘
              │
      ┌───────┴────────┐
@@ -156,7 +156,7 @@ pub struct SealContext {
 }
 ```
 
-**Important:** Use `BTreeMap` (not `HashMap`) for deterministic JSON serialization.
+**Important:** Use `BTreeMap` (not `HashMap`) for deterministic binary serialization.
 
 ### VerifyResult
 
@@ -208,21 +208,28 @@ pub fn create_seal(
    - `metadata = metadata`
 3. Construct binding:
    ```rust
-   let binding = [
-       hex::encode(content_hash.as_bytes()).as_bytes(),
-       serde_json::to_vec(&context)?.as_slice()
-   ].concat();
+   let context_bytes = postcard::to_allocvec(&context)?;
+   let mut binding = Vec::with_capacity(content_hash.len() + context_bytes.len());
+   binding.extend_from_slice(content_hash.as_bytes());
+   binding.extend_from_slice(&context_bytes);
    ```
 4. Sign:
    - `σ₁ = mldsa_sign(&keypair.mldsa_secret_key, &binding, rng)`
    - `σ₂ = slhdsa_sign(&keypair.slhdsa_secret_key, &binding, rng)`
 5. Create signature blocks
-6. Compute `seal_id`:
+6. Compute `seal_id` by hashing components directly:
    ```rust
-   let mut temp_seal = seal.clone();
-   temp_seal.seal_id = String::new();
-   let seal_json = serde_json::to_vec(&temp_seal)?;
-   let seal_id = hex::encode(blake3::hash(&seal_json).as_bytes());
+   let mut seal_id_hasher = blake3::Hasher::new();
+   seal_id_hasher.update(&SCHEMA_VERSION.to_le_bytes());
+   seal_id_hasher.update(content_hash.as_bytes());
+   seal_id_hasher.update(primary.algorithm.as_bytes());
+   seal_id_hasher.update(primary.signature.as_bytes());
+   seal_id_hasher.update(primary.key_id.as_bytes());
+   seal_id_hasher.update(backup.algorithm.as_bytes());
+   seal_id_hasher.update(backup.signature.as_bytes());
+   seal_id_hasher.update(backup.key_id.as_bytes());
+   seal_id_hasher.update(&context_bytes);
+   let seal_id = hex::encode(seal_id_hasher.finalize().as_bytes());
    ```
 7. Return complete `Seal`
 

@@ -452,7 +452,7 @@ NEVER use `std::sync::Mutex`, `std::sync::RwLock`, or any other `std::sync` prim
 ```toml
 [features]
 default = ["std"]
-std = ["alloc", "blake3/std", "rand_chacha/std", "rand_core/std", "serde_json/std", "hex/std", "derive_more/std"]
+std = ["alloc", "blake3/std", "hex/std"]
 alloc = []
 ```
 
@@ -471,7 +471,7 @@ alloc = []
 | `rand_core` | `default-features = false` | `RngCore`, `CryptoRng`, `SeedableRng` traits |
 | `getrandom` | `default-features = false` | OS/hardware entropy for re-seeding |
 | `serde` | `default-features = false, features = ["derive", "alloc"]` | Serialization |
-| `serde_json` | `default-features = false, features = ["alloc"]` | JSON serialization |
+| `postcard` | `default-features = false, features = ["alloc"]` | Binary serialization |
 | `spin` | (bare) | Spinlock mutex for `no_std` |
 | `hex` | `default-features = false, features = ["alloc"]` | Hex encoding |
 | `zeroize` | `default-features = false` | Secure memory cleanup |

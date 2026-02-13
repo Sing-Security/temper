@@ -18,19 +18,21 @@ mod tests {
 
         // -- Setup & Fixtures
         let mut rng = TemperEntropy::from_seed([0x50; 32]);
-        let keypair = generate_keypair(&mut rng, "test@example.com").unwrap();
+        let keypair = generate_keypair(&mut rng, "test@example.com")
+            .expect("Failed to generate keypair");
         let content = b"Test message for seal verification";
         let metadata = BTreeMap::new();
 
         // -- Exec
-        let seal = create_seal(&mut rng, content, &keypair, metadata).unwrap();
+        let seal = create_seal(&mut rng, content, &keypair, metadata)
+            .expect("Failed to create seal");
         let result = verify_seal(
             content,
             &seal,
             &keypair.mldsa_public_key,
             &keypair.slhdsa_public_key,
         )
-        .unwrap();
+        .expect("Failed to verify seal");
 
         // -- Check
         assert!(
@@ -54,20 +56,22 @@ mod tests {
 
         // -- Setup & Fixtures
         let mut rng = TemperEntropy::from_seed([0x51; 32]);
-        let keypair = generate_keypair(&mut rng, "test@example.com").unwrap();
+        let keypair = generate_keypair(&mut rng, "test@example.com")
+            .expect("Failed to generate keypair");
         let original_content = b"Original message";
         let tampered_content = b"Tampered message";
         let metadata = BTreeMap::new();
 
         // -- Exec
-        let seal = create_seal(&mut rng, original_content, &keypair, metadata).unwrap();
+        let seal = create_seal(&mut rng, original_content, &keypair, metadata)
+            .expect("Failed to create seal");
         let result = verify_seal(
             tampered_content,
             &seal,
             &keypair.mldsa_public_key,
             &keypair.slhdsa_public_key,
         )
-        .unwrap();
+        .expect("Failed to verify seal");
 
         // -- Check
         assert!(
@@ -86,20 +90,23 @@ mod tests {
 
         // -- Setup & Fixtures
         let mut rng = TemperEntropy::from_seed([0x52; 32]);
-        let keypair_a = generate_keypair(&mut rng, "alice@example.com").unwrap();
-        let keypair_b = generate_keypair(&mut rng, "bob@example.com").unwrap();
+        let keypair_a = generate_keypair(&mut rng, "alice@example.com")
+            .expect("Failed to generate keypair A");
+        let keypair_b = generate_keypair(&mut rng, "bob@example.com")
+            .expect("Failed to generate keypair B");
         let content = b"Message from Alice";
         let metadata = BTreeMap::new();
 
         // -- Exec
-        let seal = create_seal(&mut rng, content, &keypair_a, metadata).unwrap();
+        let seal = create_seal(&mut rng, content, &keypair_a, metadata)
+            .expect("Failed to create seal");
         let result = verify_seal(
             content,
             &seal,
             &keypair_b.mldsa_public_key, // Wrong key
             &keypair_b.slhdsa_public_key,  // Wrong key
         )
-        .unwrap();
+        .expect("Failed to verify seal");
 
         // -- Check
         assert!(
@@ -164,7 +171,8 @@ mod tests {
         hasher1.update(seal.backup.algorithm.as_bytes());
         hasher1.update(seal.backup.signature.as_bytes());
         hasher1.update(seal.backup.key_id.as_bytes());
-        let context_bytes1 = postcard::to_allocvec(&seal.context).unwrap();
+        let context_bytes1 = postcard::to_allocvec(&seal.context)
+            .expect("Failed to serialize context");
         hasher1.update(&context_bytes1);
         let seal_id1 = hex::encode(hasher1.finalize().as_bytes());
 
@@ -177,7 +185,8 @@ mod tests {
         hasher2.update(seal.backup.algorithm.as_bytes());
         hasher2.update(seal.backup.signature.as_bytes());
         hasher2.update(seal.backup.key_id.as_bytes());
-        let context_bytes2 = postcard::to_allocvec(&seal.context).unwrap();
+        let context_bytes2 = postcard::to_allocvec(&seal.context)
+            .expect("Failed to serialize context");
         hasher2.update(&context_bytes2);
         let seal_id2 = hex::encode(hasher2.finalize().as_bytes());
 
@@ -222,8 +231,10 @@ mod tests {
         };
 
         // -- Exec
-        let bytes = postcard::to_allocvec(&original_seal).unwrap();
-        let deserialized_seal: Seal = postcard::from_bytes(&bytes).unwrap();
+        let bytes = postcard::to_allocvec(&original_seal)
+            .expect("Failed to serialize seal");
+        let deserialized_seal: Seal = postcard::from_bytes(&bytes)
+            .expect("Failed to deserialize seal");
 
         // -- Check
         assert_eq!(

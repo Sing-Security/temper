@@ -165,7 +165,7 @@ pub fn new() -> Result<Self> {
 
 - Use `BTreeMap` from `alloc::collections`, never `HashMap` (iteration order is non-deterministic)
 - Use BLAKE3 for content-addressed IDs (same as desmond pattern)
-- All serialization must be canonical (serde_json with sorted keys)
+- All serialization must be canonical (postcard for binary, deterministic ordering)
 - No reliance on memory addresses, ASLR, or timing outside of entropy collection
 
 **Example:**
@@ -374,7 +374,7 @@ cargo tree --no-default-features --features alloc
 - `rand_chacha` — ChaCha20 DRBG
 - `rand_core` — RNG trait definitions
 - `getrandom` — OS entropy (feature-gated for std)
-- `serde`, `serde_json` — Serialization (`alloc` feature)
+- `serde`, `postcard` — Serialization (`alloc` feature)
 - `spin` — Spinlock mutex for `no_std`
 - `hex` — Hex encoding (`alloc` feature)
 - `zeroize` — Secure memory clearing
