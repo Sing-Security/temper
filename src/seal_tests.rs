@@ -9,9 +9,8 @@ mod tests {
     use alloc::collections::BTreeMap;
     use alloc::string::{String, ToString};
     use alloc::vec;
-    use alloc::vec::Vec;
 
-    // region:    --- Integration Tests (Ignored until PQC wired)
+    // region:    --- Integration Tests
 
     #[test]
     fn test_seal_roundtrip() {

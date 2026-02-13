@@ -184,6 +184,8 @@ All dependencies are `no_std` compatible:
 | Dependency | Version | Purpose | no_std Compatible |
 |------------|---------|---------|-------------------|
 | `blake3` | 1.x | Cryptographic hashing | ✅ |
+| `ml-dsa` | 0.1.0-rc.7 | FIPS 204 ML-DSA-65 signatures | ✅ |
+| `slh-dsa` | 0.2.0-rc.4 | FIPS 205 SLH-DSA signatures | ✅ |
 | `rand_chacha` | 0.3 | ChaCha20 DRBG | ✅ |
 | `rand_core` | 0.6 | RNG trait definitions | ✅ |
 | `getrandom` | 0.2 | OS entropy (std only) | ⚠️ (std feature) |
@@ -231,33 +233,37 @@ Temper includes comprehensive statistical and cryptographic tests:
 7. **Health Metrics**: Accurate tracking of internal counters
 
 ### Cryptographic Tests (Seal)
-1. **Roundtrip**: Sign and verify produces valid=true (ignored until PQC wired)
-2. **Tamper Detection**: Modified content invalidates seal (ignored)
-3. **Key Isolation**: Wrong key rejects seal (ignored)
+1. **Roundtrip**: Sign and verify produces valid=true ✅
+2. **Tamper Detection**: Modified content invalidates seal ✅
+3. **Key Isolation**: Wrong key rejects seal ✅
 4. **Seal ID Determinism**: Same inputs produce same BLAKE3 ID ✅
 5. **Serde Roundtrip**: Serialization preserves structure ✅
 6. **Key ID Determinism**: BLAKE3(pk₁ || pk₂) is deterministic ✅
 
-**Note:** Tests 1-3 for Seal are marked `#[ignore]` until ML-DSA and SLH-DSA primitives are wired. The protocol structure and binding logic are complete.
+All seal tests pass with fully integrated ML-DSA-65 and SLH-DSA signatures.
 
 ---
 
 ## Post-Quantum Cryptography Status
 
-### Current Implementation
+### Current Implementation — ✅ **Production Ready**
 - ✅ Seal protocol structure (complete)
 - ✅ Dual signature binding construction (complete)
 - ✅ Verification logic (complete)
-- ⚠️ PQC primitives (stubs with `todo!()`)
+- ✅ **PQC primitives fully integrated and tested**
 
-### To Wire
-1. **ML-DSA-65** (FIPS 204): Use [ml-dsa](https://docs.rs/ml-dsa) from RustCrypto
+### Integrated Algorithms
+1. **ML-DSA-65** (FIPS 204): [ml-dsa v0.1.0-rc.7](https://docs.rs/ml-dsa) from RustCrypto
+   - Lattice-based, NIST security level 3, Module-LWE hardness
    - Key sizes: sk=4032 bytes, pk=1952 bytes, sig=3309 bytes
-2. **SLH-DSA** (FIPS 205): Use [slh-dsa](https://docs.rs/slh-dsa) from RustCrypto
-   - Algorithm: SLH-DSA-SHA2-128s (small, fast)
+   - ✅ Keygen, sign, and verify fully implemented
+   
+2. **SLH-DSA-SHA2-128s** (FIPS 205): [slh-dsa v0.2.0-rc.4](https://docs.rs/slh-dsa) from RustCrypto
+   - Hash-based, NIST security level 5, stateless signatures
    - Key sizes: sk=64 bytes, pk=32 bytes, sig=7856 bytes
+   - ✅ Keygen, sign, and verify fully implemented
 
-Once wired, remove `#[ignore]` from seal tests 1-3.
+All cryptographic tests pass. The dual signature protocol is production-ready.
 
 ---
 
@@ -265,9 +271,9 @@ Once wired, remove `#[ignore]` from seal tests 1-3.
 
 ### v0.1.0 (Current)
 - ✅ `no_std` compatible entropy generation
-- ✅ Dual PQC signature protocol structure
+- ✅ **Dual PQC signature protocol (ML-DSA-65 + SLH-DSA) — Production Ready**
 - ✅ Statistical verification tests
-- ⚠️ PQC primitives (stubs)
+- ✅ **Fully integrated and tested cryptographic primitives**
 
 ### v0.2.0 (Planned)
 - [ ] ML-KEM-1024 hybrid key encapsulation (Envelope module)
