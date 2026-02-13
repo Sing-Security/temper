@@ -30,8 +30,17 @@ use alloc::collections::BTreeMap;
 #[cfg(feature = "alloc")]
 use alloc::format;
 
+use core::convert::TryFrom;
+
+use ml_dsa::signature::{Signer as MlSigner, Verifier as MlVerifier};
+use ml_dsa::{EncodedVerifyingKey as MlEncodedVerifyingKey, KeyGen, MlDsa65};
+use slh_dsa::signature::{Keypair as SlhKeypair, Signer as SlhSigner, Verifier as SlhVerifier};
+use slh_dsa::Sha2_128s;
+use zeroize::Zeroize;
+
 use crate::entropy::TemperEntropy;
 use crate::error::{Error, Result};
+use rand_core::RngCore;
 
 // region:    --- Constants
 
@@ -71,6 +80,13 @@ pub struct TemperKeypair {
     pub signer_id: String,
     /// BLAKE3(mldsa_pk || slhdsa_pk) as hex.
     pub key_id: String,
+}
+
+impl Drop for TemperKeypair {
+    fn drop(&mut self) {
+        self.mldsa_secret_key.zeroize();
+        self.slhdsa_secret_key.zeroize();
+    }
 }
 
 /// Complete seal binding a content hash to dual quantum-safe signatures.
@@ -145,7 +161,7 @@ pub struct VerifyResult {
 
 // endregion: --- Data Structures
 
-// region:    --- Post-Quantum Signature Primitives (Stubs)
+// region:    --- Post-Quantum Signature Primitives
 
 // # Post-Quantum Signature Primitives
 //
@@ -167,18 +183,42 @@ pub struct VerifyResult {
 /// - Secret key: 4032 bytes
 /// - Public key: 1952 bytes
 /// - Signature: 3309 bytes
-fn mldsa_keygen(_rng: &mut TemperEntropy) -> Result<(Vec<u8>, Vec<u8>)> {
-    todo!("Wire ML-DSA-65 from RustCrypto/signatures crate (https://docs.rs/ml-dsa)")
+fn mldsa_keygen(rng: &mut TemperEntropy) -> Result<(Vec<u8>, Vec<u8>)> {
+    let mut seed_bytes = [0u8; 32];
+    rng.fill_bytes(&mut seed_bytes);
+
+    let seed = ml_dsa::Seed::from(seed_bytes);
+    let keypair = MlDsa65::from_seed(&seed);
+    let pk = keypair.verifying_key().encode().as_slice().to_vec();
+    let sk = seed.as_slice().to_vec();
+
+    seed_bytes.zeroize();
+
+    Ok((sk, pk))
 }
 
 /// Sign a message with ML-DSA-65.
-fn mldsa_sign(_sk: &[u8], _message: &[u8], _rng: &mut TemperEntropy) -> Result<Vec<u8>> {
-    todo!("Wire ML-DSA-65 signing")
+fn mldsa_sign(sk: &[u8], message: &[u8], _rng: &mut TemperEntropy) -> Result<Vec<u8>> {
+    let seed = ml_dsa::Seed::try_from(sk)
+        .map_err(|_| Error::CryptoError("Invalid ML-DSA-65 seed".to_string()))?;
+    let signing_key = ml_dsa::SigningKey::<MlDsa65>::from_seed(&seed);
+    let signature = MlSigner::try_sign(&signing_key, message)
+        .map_err(|_| Error::CryptoError("ML-DSA-65 signing failed".to_string()))?;
+    Ok(signature.encode().as_slice().to_vec())
 }
 
 /// Verify an ML-DSA-65 signature.
-fn mldsa_verify(_pk: &[u8], _message: &[u8], _signature: &[u8]) -> bool {
-    todo!("Wire ML-DSA-65 verification")
+fn mldsa_verify(pk: &[u8], message: &[u8], signature: &[u8]) -> bool {
+    let encoded_pk = match MlEncodedVerifyingKey::<MlDsa65>::try_from(pk) {
+        Ok(value) => value,
+        Err(_) => return false,
+    };
+    let verifying_key = ml_dsa::VerifyingKey::<MlDsa65>::decode(&encoded_pk);
+    let signature = match ml_dsa::Signature::<MlDsa65>::try_from(signature) {
+        Ok(value) => value,
+        Err(_) => return false,
+    };
+    MlVerifier::verify(&verifying_key, message, &signature).is_ok()
 }
 
 /// Generate SLH-DSA keypair.
@@ -192,18 +232,46 @@ fn mldsa_verify(_pk: &[u8], _message: &[u8], _signature: &[u8]) -> bool {
 /// - Secret key: 64 bytes
 /// - Public key: 32 bytes
 /// - Signature: 7856 bytes
-fn slhdsa_keygen(_rng: &mut TemperEntropy) -> Result<(Vec<u8>, Vec<u8>)> {
-    todo!("Wire SLH-DSA from RustCrypto/signatures crate (https://docs.rs/slh-dsa)")
+fn slhdsa_keygen(rng: &mut TemperEntropy) -> Result<(Vec<u8>, Vec<u8>)> {
+    let mut sk_seed = [0u8; 16];
+    let mut sk_prf = [0u8; 16];
+    let mut pk_seed = [0u8; 16];
+    rng.fill_bytes(&mut sk_seed);
+    rng.fill_bytes(&mut sk_prf);
+    rng.fill_bytes(&mut pk_seed);
+
+    let signing_key =
+        slh_dsa::SigningKey::<Sha2_128s>::slh_keygen_internal(&sk_seed, &sk_prf, &pk_seed);
+    let sk = signing_key.to_bytes().as_slice().to_vec();
+    let pk = signing_key.verifying_key().to_bytes().as_slice().to_vec();
+
+    sk_seed.zeroize();
+    sk_prf.zeroize();
+    pk_seed.zeroize();
+
+    Ok((sk, pk))
 }
 
 /// Sign a message with SLH-DSA.
-fn slhdsa_sign(_sk: &[u8], _message: &[u8], _rng: &mut TemperEntropy) -> Result<Vec<u8>> {
-    todo!("Wire SLH-DSA signing")
+fn slhdsa_sign(sk: &[u8], message: &[u8], _rng: &mut TemperEntropy) -> Result<Vec<u8>> {
+    let signing_key = slh_dsa::SigningKey::<Sha2_128s>::try_from(sk)
+        .map_err(|_| Error::CryptoError("Invalid SLH-DSA signing key".to_string()))?;
+    let signature = SlhSigner::try_sign(&signing_key, message)
+        .map_err(|_| Error::CryptoError("SLH-DSA signing failed".to_string()))?;
+    Ok(signature.to_bytes().as_slice().to_vec())
 }
 
 /// Verify an SLH-DSA signature.
-fn slhdsa_verify(_pk: &[u8], _message: &[u8], _signature: &[u8]) -> bool {
-    todo!("Wire SLH-DSA verification")
+fn slhdsa_verify(pk: &[u8], message: &[u8], signature: &[u8]) -> bool {
+    let verifying_key = match slh_dsa::VerifyingKey::<Sha2_128s>::try_from(pk) {
+        Ok(value) => value,
+        Err(_) => return false,
+    };
+    let signature = match slh_dsa::Signature::<Sha2_128s>::try_from(signature) {
+        Ok(value) => value,
+        Err(_) => return false,
+    };
+    SlhVerifier::verify(&verifying_key, message, &signature).is_ok()
 }
 
 // endregion: --- Post-Quantum Signature Primitives
