@@ -4,6 +4,31 @@ applyTo: "src/*_tests.rs"
 
 # Testing Instructions
 
+## Pattern Memory for Tests
+
+**Before writing any test**, recall and reuse these established patterns:
+
+### Memory: Test Structure Pattern
+- **Origin**: All existing tests in `entropy_tests.rs`, `seal_tests.rs`
+- **Pattern**: Three-section comment structure (Setup/Exec/Check)
+- **Reason**: Consistent, readable, and maintainable test code
+
+### Memory: Mathematical Documentation Pattern
+- **Origin**: `entropy_tests.rs` chi-squared, autocorrelation tests
+- **Pattern**: Document statistical basis with formulas and thresholds
+- **Reason**: Tests are mathematical proofs, not just code checks
+
+### Memory: Statistical Threshold Values
+- **Chi-squared**: [198.4, 310.5] for 255 df at p=0.001 (from `test_entropy_byte_distribution`)
+- **Autocorrelation**: |r| < 0.019 for N=100,000 (from `test_autocorrelation`)
+- **Bit balance**: N/2 ± 4σ where σ = √(N/4) (from `test_bit_balance`)
+- **Avalanche**: 128 ± 10 bit flips for 256-bit output (from `test_avalanche`)
+- **Reason**: Reuse proven thresholds from existing statistical tests
+
+**When creating new tests**: Apply these patterns FIRST, then adapt to specific needs.
+
+---
+
 ## Test Structure
 
 **ALL tests MUST follow the three-section pattern:**

@@ -4,6 +4,51 @@ applyTo: "**/*.rs"
 
 # Rust no_std Patterns
 
+## Pattern Memory for no_std
+
+**Before writing any Rust code**, recall and reuse these established patterns:
+
+### Memory: Import Pattern
+- **Origin**: All `src/*.rs` files
+- **Pattern**: `use alloc::*` for heap types, `use core::*` for primitives, `use spin::Mutex` for concurrency
+- **Anti-Pattern**: NEVER `use std::*` without `#[cfg(feature = "std")]`
+- **Reason**: Embedded compatibility, no_std is non-negotiable
+
+### Memory: Determinism via BTreeMap
+- **Origin**: All serializable structs (seal.rs, entropy.rs)
+- **Pattern**: `BTreeMap<K, V>` from `alloc::collections`
+- **Anti-Pattern**: NEVER `HashMap` (iteration order is non-deterministic)
+- **Reason**: Reproducible builds, deterministic serialization
+
+### Memory: Error Handling Pattern
+- **Origin**: `error.rs`
+- **Pattern**: 
+  ```rust
+  use derive_more::{Display, From};
+  #[derive(Debug, Display, From)]
+  #[display("{self:?}")]
+  pub enum Error { ... }
+  ```
+- **Reason**: no_std compatible, avoids implementing Display manually
+
+### Memory: Feature Gate Pattern
+- **Origin**: Multiple files with std-dependent code
+- **Pattern**: 
+  ```rust
+  #[cfg(feature = "std")]
+  impl std::error::Error for Error {}
+  ```
+- **Reason**: Conditional compilation for std-only functionality
+
+### Memory: Thread Safety Pattern
+- **Origin**: `entropy.rs` Mutex usage
+- **Pattern**: `spin::Mutex<T>` (NOT `std::sync::Mutex<T>`)
+- **Reason**: no_std spinlock, available in embedded environments
+
+**When writing new Rust code**: Apply these patterns FIRST to avoid std dependencies.
+
+---
+
 ## Core Principle
 
 **The crate MUST compile with `#![no_std]` at the root.** All std functionality is behind `#[cfg(feature = "std")]` gates.

@@ -4,6 +4,39 @@ applyTo: "src/entropy*.rs"
 
 # Entropy Module Instructions
 
+## Pattern Memory for Entropy
+
+**Before modifying entropy code**, recall and reuse these established patterns:
+
+### Memory: Domain Separation Constants
+- **Origin**: `entropy.rs` lines 19-22
+- **Pattern**: 
+  ```rust
+  const DOMAIN_POOL: &str = "Temper.Pool.v1.desmond";
+  const DOMAIN_DRBG_INIT: &str = "Temper.DRBG.Init.v1";
+  const DOMAIN_DRBG_RESEED: &str = "Temper.DRBG.Reseed.v1";
+  ```
+- **Reason**: Prevents cross-protocol attacks, consistent naming scheme
+
+### Memory: Re-seed Trigger
+- **Origin**: `entropy.rs` RESEED_THRESHOLD
+- **Value**: `1_048_576` (2²⁰ bytes)
+- **Reason**: Forward secrecy without excessive performance impact
+
+### Memory: Thread Safety Pattern
+- **Origin**: `entropy.rs` TemperEntropy structure
+- **Pattern**: `state: Mutex<EntropyState>` using `spin::Mutex`
+- **Reason**: no_std compatible concurrency, not `std::sync::Mutex`
+
+### Memory: Health Metrics Structure
+- **Origin**: `entropy.rs` EntropyHealth
+- **Pattern**: `Copy` type with read-only snapshot fields
+- **Reason**: Diagnostics without exposing mutable internal state
+
+**When extending entropy**: Apply these patterns to maintain consistency.
+
+---
+
 ## Overview
 
 The entropy module implements a hardened CSPRNG (Cryptographically Secure Pseudo-Random Number Generator) with multi-source entropy pooling, BLAKE3-based mixing, and ChaCha20 DRBG output.

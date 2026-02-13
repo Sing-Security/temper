@@ -4,6 +4,39 @@ applyTo: "src/seal*.rs"
 
 # Seal Module Instructions
 
+## Pattern Memory for Seal
+
+**Before modifying seal code**, recall and reuse these established patterns:
+
+### Memory: Schema Versioning Pattern
+- **Origin**: All serializable structs in `seal.rs`
+- **Pattern**: `pub schema_version: u16,` as first field
+- **Reason**: Forward compatibility for protocol evolution
+
+### Memory: Dual Signature Defense
+- **Origin**: `seal.rs` Seal structure
+- **Pattern**: `primary: SignatureBlock` (ML-DSA-65) + `backup: SignatureBlock` (SLH-DSA)
+- **Reason**: Defense-in-depth — both must be broken to forge
+
+### Memory: Content-Addressed ID Pattern
+- **Origin**: `seal.rs` seal_id, key_id computation
+- **Pattern**: `BLAKE3(canonical_json_with_empty_id_field)`
+- **Reason**: Deterministic IDs, prevents circular dependencies
+
+### Memory: Metadata Determinism
+- **Origin**: `seal.rs` SealContext structure
+- **Pattern**: `metadata: BTreeMap<String, String>` (NOT HashMap)
+- **Reason**: Deterministic JSON serialization, reproducible seals
+
+### Memory: Domain Separation for Seal
+- **Origin**: `seal.rs` SEAL_DOMAIN constant
+- **Value**: `"Temper.Seal.v1"`
+- **Reason**: Prevents cross-protocol attacks (different from entropy domains)
+
+**When extending seal**: Apply these patterns to new signature or verification logic.
+
+---
+
 ## Overview
 
 The Seal module implements a dual post-quantum signature protocol that binds a BLAKE3 content hash to two independent quantum-safe signatures (ML-DSA-65 and SLH-DSA). This provides defense-in-depth: even if one signature scheme is broken, the other remains secure.
