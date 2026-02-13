@@ -2,5 +2,46 @@
 name = "temper"
 version = "0.1.0"
 edition = "2024"
+description = "Temper — Quantum-safe cryptographic protocol with hardened entropy and dual PQC signatures. Fully no_std for embedded."
+license = "Apache-2.0"
+repository = "https://github.com/Sing-Security/temper"
+keywords = ["cryptography", "post-quantum", "no-std", "embedded", "blake3"]
+categories = ["cryptography", "no-std"]
+
+[lib]
+doctest = false
+
+[features]
+default = ["std"]
+std = ["alloc", "blake3/std", "serde_json/std", "hex/std"]
+alloc = []
 
 [dependencies]
+# -- Cryptography
+blake3 = { version = "1", default-features = false }
+
+# -- DRBG
+rand_chacha = { version = "0.3", default-features = false }
+rand_core = { version = "0.6", default-features = false }
+
+# -- Entropy seeding
+getrandom = { version = "0.2", default-features = false }
+
+# -- Serialization
+serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "1", default-features = false, features = ["alloc"] }
+
+# -- Concurrency (no_std spinlock)
+spin = "0.9"
+
+# -- Encoding
+hex = { version = "0.4", default-features = false, features = ["alloc"] }
+
+# -- Secure memory
+zeroize = { version = "1", default-features = false }
+
+# -- Error handling (no_std compatible proc-macro)
+derive_more = { version = "2", default-features = false, features = ["from", "display"] }
+
+[dev-dependencies]
+rand = "0.8"
