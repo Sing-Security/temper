@@ -64,14 +64,14 @@
      ▼                 ▼
 ┌─────────┐      ┌──────────┐
 │ Context │      │   Hex    │
-│  JSON   │      │  String  │
+│ Postcard│      │  String  │
 └────┬────┘      └────┬─────┘
      │                │
      └────────┬───────┘ Concatenate
               │
               ▼
       ┌──────────────┐
-      │   Binding    │ = hex(hash) || json(context)
+      │   Binding    │ = hex(hash) || postcard(context)
       └──────┬───────┘
              │
      ┌───────┴────────┐
@@ -190,7 +190,7 @@ All dependencies are `no_std` compatible:
 | `rand_core` | 0.6 | RNG trait definitions | ✅ |
 | `getrandom` | 0.2 | OS entropy (std only) | ⚠️ (std feature) |
 | `serde` | 1.x | Serialization | ✅ (with alloc) |
-| `serde_json` | 1.x | JSON encoding | ✅ (with alloc) |
+| `postcard` | 1.x | Binary encoding | ✅ (with alloc) |
 | `spin` | 0.9 | Spinlock mutex | ✅ |
 | `hex` | 0.4 | Hex encoding | ✅ (with alloc) |
 | `zeroize` | 1.x | Secure memory clearing | ✅ |

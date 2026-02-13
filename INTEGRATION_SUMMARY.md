@@ -50,7 +50,7 @@ Both libraries are from RustCrypto and are fully `no_std` compatible.
 
 **Binding Construction:**
 ```
-binding = hex(BLAKE3(content)) || json(SealContext)
+binding = hex(BLAKE3(content)) || postcard(SealContext)
 ```
 
 **Dual Signatures:**
@@ -112,7 +112,7 @@ All 14 tests pass (100% success rate):
 - ✅ **Tamper detection**: Modified content invalidates seal
 - ✅ **Key isolation**: Wrong keypair fails verification
 - ✅ Seal ID determinism (BLAKE3-based)
-- ✅ Serde roundtrip (JSON serialization)
+- ✅ Serde roundtrip (postcard serialization)
 - ✅ Key ID determinism (BLAKE3 of public keys)
 
 **No ignored tests** — all cryptographic functionality is fully operational.
