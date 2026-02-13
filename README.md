@@ -294,7 +294,19 @@ Contributions are welcome! Please ensure:
 - All code is `no_std` compatible
 - Statistical tests pass (`cargo test`)
 - Both build configurations work (`cargo check --no-default-features --features alloc && cargo check`)
-- Follow the code style in `.github/copilot-instructions.md`
+- Follow the code style and patterns in `.github/copilot-instructions.md`
+- Review `.github/MEMORY_PATTERN_EXAMPLES.md` for guidance on maintaining architectural consistency
+
+### Pattern Memory System
+
+This project uses a **pattern memory system** to maintain architectural consistency:
+
+1. **Read before coding**: Review `.github/copilot-instructions.md` and relevant `.github/instructions/*.instructions.md` files
+2. **Apply existing patterns**: Use established conventions for error handling, testing, domain separation, etc.
+3. **Annotate with memory comments**: Add `// Memory: <source> — <reason>` when applying patterns
+4. **Evolve meta-patterns**: Update instruction files when discovering reusable patterns
+
+See `.github/MEMORY_PATTERN_EXAMPLES.md` for detailed examples of the memory pattern system in action.
 
 ---
 
