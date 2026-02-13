@@ -21,11 +21,11 @@ alloc = []
 blake3 = { version = "1", default-features = false }
 
 # -- DRBG
-rand_chacha = { version = "0.10", default-features = false }
-rand_core = { version = "0.10", default-features = false }
+rand_chacha = { version = "0.3", default-features = false }
+rand_core = { version = "0.6", default-features = false }
 
 # -- Entropy seeding
-getrandom = { version = "0.4", default-features = false }
+getrandom = { version = "0.2", default-features = false }
 
 # -- Serialization
 serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
@@ -44,4 +44,4 @@ zeroize = { version = "1", default-features = false }
 derive_more = { version = "2", default-features = false, features = ["from", "display"] }
 
 [dev-dependencies]
-rand = "0.9"
+rand = "0.8"
