@@ -17,8 +17,12 @@ extern crate alloc;
 pub mod entropy_source;
 pub mod entropy;
 pub mod error;
+pub mod crypto_provider;
 pub mod seal;
 pub mod envelope;
+
+#[cfg(feature = "std")]
+pub mod plugins;
 
 #[cfg(feature = "hardware_example")]
 pub mod hardware_example;
@@ -42,6 +46,7 @@ mod envelope_tests;
 pub use entropy::{TemperEntropy, EntropyHealth};
 pub use entropy_source::{EntropySource, EntropyError};
 pub use error::{Error, Result};
+pub use crypto_provider::{CryptoProvider, get_crypto_provider, set_crypto_provider};
 pub use seal::{Seal, SealContext, SignatureBlock, TemperKeypair, VerifyResult};
 pub use seal::{generate_keypair, create_seal, verify_seal};
 
