@@ -16,8 +16,8 @@
 //! 1. `content_hash = BLAKE3(message)` — 256-bit content-addressed hash
 //! 2. `context = SealContext { domain, timestamp, signer_id, metadata }`
 //! 3. `binding = hex(content_hash) || postcard(context)` — deterministic binding
-//! 4. `σ₁ = ML-DSA-65.Sign(sk₁, binding)` — lattice-based signature (3309 bytes)
-//! 5. `σ₂ = SLH-DSA.Sign(sk₂, binding)` — hash-based signature (7856 bytes)
+//! 4. `σ₁ = ML-DSA-65.Sign(sk₁, binding)` — lattice-based signature (3309 bytes, stored as raw bytes)
+//! 5. `σ₂ = SLH-DSA.Sign(sk₂, binding)` — hash-based signature (7856 bytes, stored as raw bytes)
 //!
 //! # Verification
 //!
@@ -162,8 +162,8 @@ pub struct SignatureBlock {
     /// Algorithm name (e.g., "ML-DSA-65", "SLH-DSA").
     pub algorithm: String,
 
-    /// Hex-encoded signature bytes.
-    pub signature: String,
+    /// Raw signature bytes (not hex-encoded for binary serialization efficiency).
+    pub signature: Vec<u8>,
 
     /// BLAKE3(public_key) as hex.
     pub key_id: String,
@@ -453,33 +453,36 @@ pub fn create_seal(
     binding.extend_from_slice(&context_bytes);
 
     // Sign with ML-DSA-65 (primary)
+    // Memory: signature optimization per problem statement — store raw bytes instead of hex
     let primary_sig = mldsa_sign(&keypair.mldsa_secret_key, &binding, rng)?;
     let primary_key_id = hex::encode(blake3::hash(&keypair.mldsa_public_key).as_bytes());
     let primary = SignatureBlock {
         algorithm: "ML-DSA-65".to_string(),
-        signature: hex::encode(&primary_sig),
+        signature: primary_sig,
         key_id: primary_key_id,
     };
 
     // Sign with SLH-DSA (backup)
+    // Memory: signature optimization per problem statement — store raw bytes instead of hex
     let backup_sig = slhdsa_sign(&keypair.slhdsa_secret_key, &binding, rng)?;
     let backup_key_id = hex::encode(blake3::hash(&keypair.slhdsa_public_key).as_bytes());
     let backup = SignatureBlock {
         algorithm: "SLH-DSA".to_string(),
-        signature: hex::encode(&backup_sig),
+        signature: backup_sig,
         key_id: backup_key_id,
     };
 
     // Compute seal ID by hashing components directly (eliminates ~22KB of clones)
     // Memory: direct BLAKE3 hashing per problem statement — eliminates temp_seal serialization
+    // Memory: signature optimization — signatures are now Vec<u8>, hash bytes directly
     let mut seal_id_hasher = blake3::Hasher::new();
     seal_id_hasher.update(&SCHEMA_VERSION.to_le_bytes());
     seal_id_hasher.update(content_hash.as_bytes());
     seal_id_hasher.update(primary.algorithm.as_bytes());
-    seal_id_hasher.update(primary.signature.as_bytes());
+    seal_id_hasher.update(&primary.signature);
     seal_id_hasher.update(primary.key_id.as_bytes());
     seal_id_hasher.update(backup.algorithm.as_bytes());
-    seal_id_hasher.update(backup.signature.as_bytes());
+    seal_id_hasher.update(&backup.signature);
     seal_id_hasher.update(backup.key_id.as_bytes());
     seal_id_hasher.update(&context_bytes);
     let seal_id = hex::encode(seal_id_hasher.finalize().as_bytes());
@@ -530,14 +533,12 @@ pub fn verify_seal(
     binding.extend_from_slice(&context_bytes);
 
     // Verify primary signature (ML-DSA-65)
-    let primary_sig_bytes = hex::decode(&seal.primary.signature)
-        .map_err(|e| Error::InvalidSignature(format!("Invalid primary signature hex: {}", e)))?;
-    let primary_valid = mldsa_verify(mldsa_pk, &binding, &primary_sig_bytes);
+    // Memory: signature optimization per problem statement — signatures are now Vec<u8>
+    let primary_valid = mldsa_verify(mldsa_pk, &binding, &seal.primary.signature);
 
     // Verify backup signature (SLH-DSA)
-    let backup_sig_bytes = hex::decode(&seal.backup.signature)
-        .map_err(|e| Error::InvalidSignature(format!("Invalid backup signature hex: {}", e)))?;
-    let backup_valid = slhdsa_verify(slhdsa_pk, &binding, &backup_sig_bytes);
+    // Memory: signature optimization per problem statement — signatures are now Vec<u8>
+    let backup_valid = slhdsa_verify(slhdsa_pk, &binding, &seal.backup.signature);
 
     // Overall validity requires all three checks to pass
     let valid = content_hash_valid && primary_valid && backup_valid;
