@@ -215,6 +215,7 @@ mod tests {
     #[test]
     fn test_hardware_trng_with_entropy() {
         use crate::TemperEntropy;
+        use rand_core::RngCore;
         
         let mut hw_rng = HardwareTrng::new();
         let entropy_result = TemperEntropy::from_sources(&mut [&mut hw_rng]);

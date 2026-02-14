@@ -67,15 +67,13 @@
 use alloc::vec::Vec;
 #[cfg(feature = "alloc")]
 use alloc::string::String;
-#[cfg(feature = "alloc")]
-use alloc::format;
 
 use crate::entropy::TemperEntropy;
 use crate::error::{Error, Result};
 use rand_core::RngCore;
 use zeroize::Zeroize;
 
-use ml_kem::{kem::{Decapsulate, Encapsulate}, KemCore, MlKem1024};
+use ml_kem::{kem::{Decapsulate, Encapsulate}, KemCore, MlKem1024, MlKem1024Params, Ciphertext, EncodedSizeUser, Encoded};
 use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519SecretKey};
 use chacha20poly1305::{
     aead::{Aead, KeyInit},
@@ -108,18 +106,18 @@ const COMBINED_SS_SIZE: usize = MLKEM_SS_SIZE + X25519_SS_SIZE;
 
 /// Envelope keypair containing both ML-KEM-1024 and X25519 keys.
 ///
-/// **Note**: Serialization stores keys as raw bytes. For encryption/decryption,
-/// use the provided methods which handle key reconstruction.
+/// **Note**: Keys are stored as raw bytes for serialization compatibility.
+/// The typed ML-KEM keys are reconstructed from bytes when needed for operations.
 #[derive(Debug, Clone)]
 pub struct EnvelopeKeypair {
     /// Schema version for future compatibility.
     pub schema_version: u16,
 
-    /// ML-KEM-1024 decapsulation key (typed).
-    mlkem_dk: ml_kem::kem::DecapsulationKey<MlKem1024>,
+    /// ML-KEM-1024 secret key bytes (for serialization and reconstruction).
+    pub mlkem_secret_key: Vec<u8>,
 
-    /// ML-KEM-1024 encapsulation key (typed).
-    mlkem_ek: ml_kem::kem::EncapsulationKey<MlKem1024>,
+    /// ML-KEM-1024 public key bytes (for serialization and reconstruction).
+    pub mlkem_public_key: Vec<u8>,
 
     /// X25519 secret key (static secret).
     pub x25519_secret_key: Vec<u8>,
@@ -129,13 +127,6 @@ pub struct EnvelopeKeypair {
 
     /// Key identifier (BLAKE3 hash of both public keys).
     pub key_id: String,
-    
-    // Public accessors for serialization
-    /// ML-KEM-1024 secret key bytes (for serialization).
-    pub mlkem_secret_key: Vec<u8>,
-
-    /// ML-KEM-1024 public key bytes (for serialization).
-    pub mlkem_public_key: Vec<u8>,
 }
 
 impl Drop for EnvelopeKeypair {
@@ -185,9 +176,9 @@ pub fn generate_envelope_keypair(rng: &mut TemperEntropy) -> Result<EnvelopeKeyp
     // Generate ML-KEM-1024 keypair
     let (mlkem_dk, mlkem_ek) = MlKem1024::generate(rng);
 
-    // Store as bytes for serialization
-    let mlkem_dk_bytes = mlkem_dk.as_ref().to_vec();
-    let mlkem_ek_bytes = mlkem_ek.as_ref().to_vec();
+    // Extract bytes using as_bytes() method
+    let mlkem_dk_bytes: Vec<u8> = mlkem_dk.as_bytes().to_vec();
+    let mlkem_ek_bytes: Vec<u8> = mlkem_ek.as_bytes().to_vec();
 
     // Generate X25519 keypair
     let (x25519_sk, x25519_pk) = x25519_keygen(rng);
@@ -200,13 +191,11 @@ pub fn generate_envelope_keypair(rng: &mut TemperEntropy) -> Result<EnvelopeKeyp
 
     Ok(EnvelopeKeypair {
         schema_version: SCHEMA_VERSION,
-        mlkem_dk,
-        mlkem_ek,
+        mlkem_secret_key: mlkem_dk_bytes,
+        mlkem_public_key: mlkem_ek_bytes,
         x25519_secret_key: x25519_sk,
         x25519_public_key: x25519_pk,
         key_id,
-        mlkem_secret_key: mlkem_dk_bytes,
-        mlkem_public_key: mlkem_ek_bytes,
     })
 }
 
@@ -216,7 +205,7 @@ pub fn generate_envelope_keypair(rng: &mut TemperEntropy) -> Result<EnvelopeKeyp
 ///
 /// * `rng` - Cryptographically secure random number generator
 /// * `plaintext` - Data to encrypt
-/// * `keypair` - Complete envelope keypair with typed ML-KEM keys
+/// * `keypair` - Envelope keypair (ML-KEM keys reconstructed from bytes)
 ///
 /// # Returns
 ///
@@ -226,11 +215,20 @@ pub fn encapsulate(
     plaintext: &[u8],
     keypair: &EnvelopeKeypair,
 ) -> Result<Envelope> {
-    // 1. ML-KEM-1024 encapsulation using typed key
-    let (mlkem_ct, mlkem_ss) = keypair.mlkem_ek.encapsulate(rng)
+    // Reconstruct ML-KEM encapsulation key from bytes
+    let mlkem_ek_encoded: &Encoded<ml_kem::kem::EncapsulationKey<MlKem1024Params>> = 
+        keypair.mlkem_public_key.as_slice().try_into()
+            .map_err(|_| Error::CryptoError("Invalid ML-KEM public key bytes".into()))?;
+    let mlkem_ek = ml_kem::kem::EncapsulationKey::<MlKem1024Params>::from_bytes(mlkem_ek_encoded);
+    
+    // 1. ML-KEM-1024 encapsulation using reconstructed key
+    let (mlkem_ct, mlkem_ss) = mlkem_ek.encapsulate(rng)
         .map_err(|_| Error::CryptoError("ML-KEM encapsulation failed".into()))?;
 
-    let mlkem_ss_bytes: [u8; 32] = *mlkem_ss.as_ref();
+    // Convert shared secret to bytes array
+    let mlkem_ss_slice: &[u8] = mlkem_ss.as_ref();
+    let mlkem_ss_bytes: [u8; 32] = mlkem_ss_slice.try_into()
+        .map_err(|_| Error::CryptoError("ML-KEM shared secret size mismatch".into()))?;
 
     // 2. Generate ephemeral X25519 key and compute shared secret
     let (x25519_ephemeral_sk_bytes, x25519_ephemeral_pk_bytes) = x25519_keygen(rng);
@@ -277,7 +275,7 @@ pub fn encapsulate(
 
     Ok(Envelope {
         schema_version: SCHEMA_VERSION,
-        mlkem_ciphertext: mlkem_ct.as_ref().to_vec(),
+        mlkem_ciphertext: mlkem_ct.to_vec(),
         x25519_ephemeral_public: x25519_ephemeral_pk_bytes,
         ciphertext,
         nonce: nonce_bytes.to_vec(),
@@ -290,7 +288,7 @@ pub fn encapsulate(
 /// # Arguments
 ///
 /// * `envelope` - The envelope to decrypt
-/// * `keypair` - Complete envelope keypair with typed ML-KEM keys
+/// * `keypair` - Envelope keypair (ML-KEM keys reconstructed from bytes)
 ///
 /// # Returns
 ///
@@ -299,14 +297,24 @@ pub fn decapsulate(
     envelope: &Envelope,
     keypair: &EnvelopeKeypair,
 ) -> Result<Vec<u8>> {
-    // 1. ML-KEM-1024 decapsulation using typed key
+    // Reconstruct ML-KEM decapsulation key from bytes
+    let mlkem_dk_encoded: &Encoded<ml_kem::kem::DecapsulationKey<MlKem1024Params>> = 
+        keypair.mlkem_secret_key.as_slice().try_into()
+            .map_err(|_| Error::CryptoError("Invalid ML-KEM secret key bytes".into()))?;
+    let mlkem_dk = ml_kem::kem::DecapsulationKey::<MlKem1024Params>::from_bytes(mlkem_dk_encoded);
+    
+    // 1. ML-KEM-1024 decapsulation using reconstructed key
     // Convert bytes to ciphertext reference
-    let ct_bytes: &[u8] = &envelope.mlkem_ciphertext;
-    let ct_ref: &ml_kem::Ciphertext<MlKem1024> = ct_bytes.try_into()
+    let ct_ref: &Ciphertext<MlKem1024> = envelope.mlkem_ciphertext.as_slice().try_into()
         .map_err(|_| Error::CryptoError("Invalid ML-KEM ciphertext length".into()))?;
     
-    let mlkem_ss = keypair.mlkem_dk.decapsulate(ct_ref);
-    let mlkem_ss_bytes: [u8; 32] = *mlkem_ss.as_ref();
+    let mlkem_ss = mlkem_dk.decapsulate(ct_ref)
+        .map_err(|_| Error::CryptoError("ML-KEM decapsulation failed".into()))?;
+    
+    // Convert shared secret to bytes array
+    let mlkem_ss_slice: &[u8] = mlkem_ss.as_ref();
+    let mlkem_ss_bytes: [u8; 32] = mlkem_ss_slice.try_into()
+        .map_err(|_| Error::CryptoError("ML-KEM shared secret size mismatch".into()))?;
 
     // 2. X25519 shared secret computation
     let x25519_static_sk = X25519SecretKey::from(
