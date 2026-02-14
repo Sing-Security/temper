@@ -83,18 +83,11 @@ use alloc::collections::BTreeMap;
 #[cfg(feature = "alloc")]
 use alloc::format;
 
-use core::convert::TryFrom;
-
-use ml_dsa::signature::{Signer as MlSigner, Verifier as MlVerifier};
-use ml_dsa::{EncodedVerifyingKey as MlEncodedVerifyingKey, KeyGen, MlDsa65};
-use slh_dsa::signature::{Keypair as SlhKeypair, Signer as SlhSigner, Verifier as SlhVerifier};
-// Memory: performance optimization per problem statement — switch from Sha2_128s (small, slow) to Sha2_128f (fast, ~50x speedup)
-use slh_dsa::Sha2_128f;
 use zeroize::Zeroize;
 
+use crate::crypto_provider::get_crypto_provider;
 use crate::entropy::TemperEntropy;
 use crate::error::{Error, Result};
-use rand_core::RngCore;
 
 // region:    --- Constants
 
@@ -286,123 +279,15 @@ pub struct VerifyResult {
 
 // # Post-Quantum Signature Primitives
 //
-// Production-ready implementations using RustCrypto PQC libraries:
-// - ML-DSA: https://docs.rs/ml-dsa (FIPS 204, lattice-based, NIST Level 3)
-// - SLH-DSA: https://docs.rs/slh-dsa (FIPS 205, hash-based, NIST Level 5)
+// The crypto operations are now delegated to the CryptoProvider abstraction,
+// which allows pluggable implementations (CPU, GPU, FPGA) while maintaining
+// the same protocol-level API.
 //
-// These primitives provide quantum-safe dual signatures with defense-in-depth:
-// - ML-DSA-65: Module-LWE hardness, 3309-byte signatures
-// - SLH-DSA-SHA2-128f: Hash-based security, 17088-byte signatures (fast variant, ~50x faster than 128s)
+// Default provider: CPU-based RustCrypto implementations (see crypto_provider::cpu)
+// - ML-DSA-65: FIPS 204, lattice-based, NIST Level 3
+// - SLH-DSA-SHA2-128f: FIPS 205, hash-based, NIST Level 5 (fast variant)
 //
-// Both primitives are fully integrated, tested, and production-ready.
-
-/// Generate ML-DSA-65 keypair.
-///
-/// # Algorithm
-///
-/// FIPS 204 ML-DSA-65 (lattice-based, NIST security level 3)
-///
-/// # Key Sizes
-///
-/// - Secret key: 4032 bytes
-/// - Public key: 1952 bytes
-/// - Signature: 3309 bytes
-#[inline]
-fn mldsa_keygen(rng: &mut TemperEntropy) -> Result<(Vec<u8>, Vec<u8>)> {
-    let mut seed_bytes = [0u8; 32];
-    rng.fill_bytes(&mut seed_bytes);
-
-    let seed = ml_dsa::Seed::from(seed_bytes);
-    let keypair = MlDsa65::from_seed(&seed);
-    let pk = keypair.verifying_key().encode().as_slice().to_vec();
-    let sk = seed.as_slice().to_vec();
-
-    seed_bytes.zeroize();
-
-    Ok((sk, pk))
-}
-
-/// Sign a message with ML-DSA-65.
-#[inline]
-fn mldsa_sign(sk: &[u8], message: &[u8], _rng: &mut TemperEntropy) -> Result<Vec<u8>> {
-    let seed = ml_dsa::Seed::try_from(sk)
-        .map_err(|_| Error::CryptoError("Invalid ML-DSA-65 seed".to_string()))?;
-    let signing_key = ml_dsa::SigningKey::<MlDsa65>::from_seed(&seed);
-    let signature = MlSigner::try_sign(&signing_key, message)
-        .map_err(|_| Error::CryptoError("ML-DSA-65 signing failed".to_string()))?;
-    Ok(signature.encode().as_slice().to_vec())
-}
-
-/// Verify an ML-DSA-65 signature.
-#[inline]
-fn mldsa_verify(pk: &[u8], message: &[u8], signature: &[u8]) -> bool {
-    let encoded_pk = match MlEncodedVerifyingKey::<MlDsa65>::try_from(pk) {
-        Ok(value) => value,
-        Err(_) => return false,
-    };
-    let verifying_key = ml_dsa::VerifyingKey::<MlDsa65>::decode(&encoded_pk);
-    let signature = match ml_dsa::Signature::<MlDsa65>::try_from(signature) {
-        Ok(value) => value,
-        Err(_) => return false,
-    };
-    MlVerifier::verify(&verifying_key, message, &signature).is_ok()
-}
-
-/// Generate SLH-DSA keypair.
-///
-/// # Algorithm
-///
-/// FIPS 205 SLH-DSA-SHA2-128f (hash-based, fast variant, ~50x faster than 128s)
-///
-/// # Key Sizes
-///
-/// - Secret key: 64 bytes
-/// - Public key: 32 bytes
-/// - Signature: 17088 bytes (larger than 128s but much faster signing)
-#[inline]
-fn slhdsa_keygen(rng: &mut TemperEntropy) -> Result<(Vec<u8>, Vec<u8>)> {
-    let mut sk_seed = [0u8; 16];
-    let mut sk_prf = [0u8; 16];
-    let mut pk_seed = [0u8; 16];
-    rng.fill_bytes(&mut sk_seed);
-    rng.fill_bytes(&mut sk_prf);
-    rng.fill_bytes(&mut pk_seed);
-
-    let signing_key =
-        slh_dsa::SigningKey::<Sha2_128f>::slh_keygen_internal(&sk_seed, &sk_prf, &pk_seed);
-    let sk = signing_key.to_bytes().as_slice().to_vec();
-    let pk = signing_key.verifying_key().to_bytes().as_slice().to_vec();
-
-    sk_seed.zeroize();
-    sk_prf.zeroize();
-    pk_seed.zeroize();
-
-    Ok((sk, pk))
-}
-
-/// Sign a message with SLH-DSA.
-#[inline]
-fn slhdsa_sign(sk: &[u8], message: &[u8], _rng: &mut TemperEntropy) -> Result<Vec<u8>> {
-    let signing_key = slh_dsa::SigningKey::<Sha2_128f>::try_from(sk)
-        .map_err(|_| Error::CryptoError("Invalid SLH-DSA signing key".to_string()))?;
-    let signature = SlhSigner::try_sign(&signing_key, message)
-        .map_err(|_| Error::CryptoError("SLH-DSA signing failed".to_string()))?;
-    Ok(signature.to_bytes().as_slice().to_vec())
-}
-
-/// Verify an SLH-DSA signature.
-#[inline]
-fn slhdsa_verify(pk: &[u8], message: &[u8], signature: &[u8]) -> bool {
-    let verifying_key = match slh_dsa::VerifyingKey::<Sha2_128f>::try_from(pk) {
-        Ok(value) => value,
-        Err(_) => return false,
-    };
-    let signature = match slh_dsa::Signature::<Sha2_128f>::try_from(signature) {
-        Ok(value) => value,
-        Err(_) => return false,
-    };
-    SlhVerifier::verify(&verifying_key, message, &signature).is_ok()
-}
+// Custom providers can be registered via set_crypto_provider() for hardware acceleration.
 
 // endregion: --- Post-Quantum Signature Primitives
 
@@ -462,11 +347,14 @@ fn compute_content_hash(content: &[u8]) -> blake3::Hash {
 ///
 /// A new `TemperKeypair` containing both ML-DSA-65 and SLH-DSA keys.
 pub fn generate_keypair(rng: &mut TemperEntropy, signer_id: &str) -> Result<TemperKeypair> {
+    // Memory: crypto provider abstraction — delegate to pluggable provider
+    let provider = get_crypto_provider();
+
     // Generate ML-DSA-65 keypair
-    let (mldsa_sk, mldsa_pk) = mldsa_keygen(rng)?;
+    let (mldsa_sk, mldsa_pk) = provider.mldsa_keygen(rng)?;
 
     // Generate SLH-DSA keypair
-    let (slhdsa_sk, slhdsa_pk) = slhdsa_keygen(rng)?;
+    let (slhdsa_sk, slhdsa_pk) = provider.slhdsa_keygen(rng)?;
 
     // Compute key ID: BLAKE3(mldsa_pk || slhdsa_pk)
     let mut hasher = blake3::Hasher::new();
@@ -528,9 +416,12 @@ pub fn create_seal(
     binding.extend_from_slice(content_hash.as_bytes());
     binding.extend_from_slice(&context_bytes);
 
+    // Memory: crypto provider abstraction — delegate to pluggable provider
+    let provider = get_crypto_provider();
+
     // Sign with ML-DSA-65 (primary)
     // Memory: signature optimization per problem statement — store raw bytes instead of hex
-    let primary_sig = mldsa_sign(&keypair.mldsa_secret_key, &binding, rng)?;
+    let primary_sig = provider.mldsa_sign(&keypair.mldsa_secret_key, &binding, rng)?;
     let primary_key_id = hex::encode(blake3::hash(&keypair.mldsa_public_key).as_bytes());
     let primary = SignatureBlock {
         algorithm: "ML-DSA-65".to_string(),
@@ -540,7 +431,7 @@ pub fn create_seal(
 
     // Sign with SLH-DSA (backup)
     // Memory: signature optimization per problem statement — store raw bytes instead of hex
-    let backup_sig = slhdsa_sign(&keypair.slhdsa_secret_key, &binding, rng)?;
+    let backup_sig = provider.slhdsa_sign(&keypair.slhdsa_secret_key, &binding, rng)?;
     let backup_key_id = hex::encode(blake3::hash(&keypair.slhdsa_public_key).as_bytes());
     let backup = SignatureBlock {
         algorithm: "SLH-DSA".to_string(),
@@ -608,13 +499,16 @@ pub fn verify_seal(
     binding.extend_from_slice(seal.content_hash.as_bytes());
     binding.extend_from_slice(&context_bytes);
 
+    // Memory: crypto provider abstraction — delegate to pluggable provider
+    let provider = get_crypto_provider();
+
     // Verify primary signature (ML-DSA-65)
     // Memory: signature optimization per problem statement — signatures are now Vec<u8>
-    let primary_valid = mldsa_verify(mldsa_pk, &binding, &seal.primary.signature);
+    let primary_valid = provider.mldsa_verify(mldsa_pk, &binding, &seal.primary.signature);
 
     // Verify backup signature (SLH-DSA)
     // Memory: signature optimization per problem statement — signatures are now Vec<u8>
-    let backup_valid = slhdsa_verify(slhdsa_pk, &binding, &seal.backup.signature);
+    let backup_valid = provider.slhdsa_verify(slhdsa_pk, &binding, &seal.backup.signature);
 
     // Overall validity requires all three checks to pass
     let valid = content_hash_valid && primary_valid && backup_valid;
