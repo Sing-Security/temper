@@ -6,6 +6,8 @@
 mod tests {
     use crate::envelope::{decapsulate, encapsulate, generate_envelope_keypair};
     use crate::entropy::TemperEntropy;
+    use alloc::vec;
+    use alloc::string::ToString;
 
     // region:    --- Integration Tests
 
