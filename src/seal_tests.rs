@@ -420,5 +420,46 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_slhdsa_signature_size_fast_variant() {
+        // Property: Verify SLH-DSA-SHA2-128f produces expected signature size
+        // Memory: performance optimization per problem statement — 128f variant has larger but faster signatures
+        
+        // -- Setup & Fixtures
+        let mut rng = TemperEntropy::from_seed([0x71; 32]);
+        let keypair = generate_keypair(&mut rng, "perf-test@example.com")
+            .expect("Failed to generate keypair");
+        let content = b"Performance test message";
+        let metadata = BTreeMap::new();
+        
+        // -- Exec
+        let seal = create_seal(&mut rng, content, &keypair, metadata)
+            .expect("Failed to create seal");
+        
+        // -- Check
+        // ML-DSA-65 signature size should be 3309 bytes
+        assert_eq!(
+            seal.primary.signature.len(),
+            3309,
+            "ML-DSA-65 signature should be 3309 bytes"
+        );
+        
+        // SLH-DSA-SHA2-128f signature size should be 17088 bytes (vs 7856 for 128s)
+        // This is the trade-off: larger signatures but ~50x faster signing
+        assert_eq!(
+            seal.backup.signature.len(),
+            17088,
+            "SLH-DSA-SHA2-128f signature should be 17088 bytes (fast variant)"
+        );
+        
+        // Verify the total seal size increase is acceptable given the performance gain
+        let total_sig_size = seal.primary.signature.len() + seal.backup.signature.len();
+        assert_eq!(
+            total_sig_size,
+            20397,
+            "Total signature size should be 20397 bytes (3309 + 17088)"
+        );
+    }
+
     // endregion: --- Unit Tests
 }
