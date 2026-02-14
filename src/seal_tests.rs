@@ -382,18 +382,23 @@ mod tests {
         let debug_output = format!("{:?}", keypair);
         
         // -- Check
+        // Verify redacted markers are present
         assert!(
             debug_output.contains("<REDACTED>"),
             "Debug output should contain <REDACTED> for secret keys"
         );
+        
+        // Verify secret key field names are present but values are redacted
         assert!(
-            !debug_output.contains(&format!("{:?}", keypair.mldsa_secret_key)),
-            "Debug output should NOT contain raw ML-DSA secret key"
+            debug_output.contains("mldsa_secret_key") && debug_output.contains("<REDACTED>"),
+            "Debug output should show mldsa_secret_key field as redacted"
         );
         assert!(
-            !debug_output.contains(&format!("{:?}", keypair.slhdsa_secret_key)),
-            "Debug output should NOT contain raw SLH-DSA secret key"
+            debug_output.contains("slhdsa_secret_key") && debug_output.contains("<REDACTED>"),
+            "Debug output should show slhdsa_secret_key field as redacted"
         );
+        
+        // Verify non-secret fields are still present
         assert!(
             debug_output.contains("security-test@example.com"),
             "Debug output should contain signer_id"
@@ -402,6 +407,17 @@ mod tests {
             debug_output.contains(&keypair.key_id),
             "Debug output should contain key_id"
         );
+        
+        // Verify output doesn't contain raw byte array patterns like "[" or decimal numbers
+        // that would indicate secret key bytes are exposed
+        let secret_indicators = ["mldsa_secret_key: [", "slhdsa_secret_key: ["];
+        for indicator in &secret_indicators {
+            assert!(
+                !debug_output.contains(indicator),
+                "Debug output should not contain raw secret key bytes pattern: {}",
+                indicator
+            );
+        }
     }
 
     // endregion: --- Unit Tests

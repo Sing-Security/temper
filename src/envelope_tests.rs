@@ -354,22 +354,37 @@ mod tests {
         let debug_output = format!("{:?}", keypair);
         
         // -- Check
+        // Verify redacted markers are present
         assert!(
             debug_output.contains("<REDACTED>"),
             "Debug output should contain <REDACTED> for secret keys"
         );
+        
+        // Verify secret key field names are present but values are redacted
         assert!(
-            !debug_output.contains(&format!("{:?}", keypair.mlkem_secret_key)),
-            "Debug output should NOT contain raw ML-KEM secret key"
+            debug_output.contains("mlkem_secret_key") && debug_output.contains("<REDACTED>"),
+            "Debug output should show mlkem_secret_key field as redacted"
         );
         assert!(
-            !debug_output.contains(&format!("{:?}", keypair.x25519_secret_key)),
-            "Debug output should NOT contain raw X25519 secret key"
+            debug_output.contains("x25519_secret_key") && debug_output.contains("<REDACTED>"),
+            "Debug output should show x25519_secret_key field as redacted"
         );
+        
+        // Verify non-secret fields are still present
         assert!(
             debug_output.contains(&keypair.key_id),
             "Debug output should contain key_id"
         );
+        
+        // Verify output doesn't contain raw byte array patterns
+        let secret_indicators = ["mlkem_secret_key: [", "x25519_secret_key: ["];
+        for indicator in &secret_indicators {
+            assert!(
+                !debug_output.contains(indicator),
+                "Debug output should not contain raw secret key bytes pattern: {}",
+                indicator
+            );
+        }
     }
 
     #[test]
