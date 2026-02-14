@@ -103,7 +103,10 @@ const PARALLEL_HASH_THRESHOLD: usize = 1024 * 1024;
 // region:    --- Data Structures
 
 /// Temper keypair containing both ML-DSA-65 and SLH-DSA keys.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+///
+/// **Security Note**: This struct implements a custom `Debug` trait that redacts secret keys
+/// to prevent accidental leakage in logs.
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct TemperKeypair {
     /// Schema version for future compatibility.
     pub schema_version: u16,
@@ -131,6 +134,21 @@ impl Drop for TemperKeypair {
     fn drop(&mut self) {
         self.mldsa_secret_key.zeroize();
         self.slhdsa_secret_key.zeroize();
+    }
+}
+
+// Memory: security fix per problem statement — prevent private key leaks in logs
+impl core::fmt::Debug for TemperKeypair {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("TemperKeypair")
+            .field("schema_version", &self.schema_version)
+            .field("mldsa_secret_key", &"<REDACTED>")
+            .field("mldsa_public_key", &format!("<{} bytes>", self.mldsa_public_key.len()))
+            .field("slhdsa_secret_key", &"<REDACTED>")
+            .field("slhdsa_public_key", &format!("<{} bytes>", self.slhdsa_public_key.len()))
+            .field("signer_id", &self.signer_id)
+            .field("key_id", &self.key_id)
+            .finish()
     }
 }
 

@@ -67,6 +67,8 @@
 use alloc::vec::Vec;
 #[cfg(feature = "alloc")]
 use alloc::string::String;
+#[cfg(feature = "alloc")]
+use alloc::format;
 
 use crate::entropy::TemperEntropy;
 use crate::error::{Error, Result};
@@ -108,7 +110,10 @@ const COMBINED_SS_SIZE: usize = MLKEM_SS_SIZE + X25519_SS_SIZE;
 ///
 /// **Note**: Keys are stored as raw bytes for serialization compatibility.
 /// The typed ML-KEM keys are reconstructed from bytes when needed for operations.
-#[derive(Debug, Clone)]
+///
+/// **Security Note**: This struct implements a custom `Debug` trait that redacts secret keys
+/// to prevent accidental leakage in logs.
+#[derive(Clone)]
 pub struct EnvelopeKeypair {
     /// Schema version for future compatibility.
     pub schema_version: u16,
@@ -133,6 +138,20 @@ impl Drop for EnvelopeKeypair {
     fn drop(&mut self) {
         self.mlkem_secret_key.zeroize();
         self.x25519_secret_key.zeroize();
+    }
+}
+
+// Memory: security fix per problem statement — prevent private key leaks in logs
+impl core::fmt::Debug for EnvelopeKeypair {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("EnvelopeKeypair")
+            .field("schema_version", &self.schema_version)
+            .field("mlkem_secret_key", &"<REDACTED>")
+            .field("mlkem_public_key", &format!("<{} bytes>", self.mlkem_public_key.len()))
+            .field("x25519_secret_key", &"<REDACTED>")
+            .field("x25519_public_key", &format!("<{} bytes>", self.x25519_public_key.len()))
+            .field("key_id", &self.key_id)
+            .finish()
     }
 }
 

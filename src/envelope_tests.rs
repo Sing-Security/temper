@@ -8,6 +8,7 @@ mod tests {
     use crate::entropy::TemperEntropy;
     use alloc::vec;
     use alloc::string::ToString;
+    use alloc::format;
 
     // region:    --- Integration Tests
 
@@ -337,6 +338,38 @@ mod tests {
             "Empty plaintext should be recovered correctly"
         );
         assert_eq!(recovered.len(), 0, "Recovered should be empty");
+    }
+
+    #[test]
+    fn test_envelope_keypair_debug_redacts_secrets() {
+        // Property: Debug output should redact secret keys to prevent accidental logging
+        // Memory: security fix per problem statement — verify Debug redaction
+        
+        // -- Setup & Fixtures
+        let mut rng = TemperEntropy::from_seed([0x71; 32]);
+        let keypair = generate_envelope_keypair(&mut rng)
+            .expect("Failed to generate envelope keypair");
+        
+        // -- Exec
+        let debug_output = format!("{:?}", keypair);
+        
+        // -- Check
+        assert!(
+            debug_output.contains("<REDACTED>"),
+            "Debug output should contain <REDACTED> for secret keys"
+        );
+        assert!(
+            !debug_output.contains(&format!("{:?}", keypair.mlkem_secret_key)),
+            "Debug output should NOT contain raw ML-KEM secret key"
+        );
+        assert!(
+            !debug_output.contains(&format!("{:?}", keypair.x25519_secret_key)),
+            "Debug output should NOT contain raw X25519 secret key"
+        );
+        assert!(
+            debug_output.contains(&keypair.key_id),
+            "Debug output should contain key_id"
+        );
     }
 
     // endregion: --- Unit Tests

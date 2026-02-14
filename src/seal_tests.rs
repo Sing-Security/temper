@@ -9,6 +9,7 @@ mod tests {
     use alloc::collections::BTreeMap;
     use alloc::string::{String, ToString};
     use alloc::vec;
+    use alloc::format;
 
     // region:    --- Integration Tests
 
@@ -364,6 +365,42 @@ mod tests {
             hash1_small.as_bytes(),
             hash1_large.as_bytes(),
             "Different content should produce different hashes"
+        );
+    }
+
+    #[test]
+    fn test_keypair_debug_redacts_secrets() {
+        // Property: Debug output should redact secret keys to prevent accidental logging
+        // Memory: security fix per problem statement — verify Debug redaction
+        
+        // -- Setup & Fixtures
+        let mut rng = TemperEntropy::from_seed([0x70; 32]);
+        let keypair = generate_keypair(&mut rng, "security-test@example.com")
+            .expect("Failed to generate keypair");
+        
+        // -- Exec
+        let debug_output = format!("{:?}", keypair);
+        
+        // -- Check
+        assert!(
+            debug_output.contains("<REDACTED>"),
+            "Debug output should contain <REDACTED> for secret keys"
+        );
+        assert!(
+            !debug_output.contains(&format!("{:?}", keypair.mldsa_secret_key)),
+            "Debug output should NOT contain raw ML-DSA secret key"
+        );
+        assert!(
+            !debug_output.contains(&format!("{:?}", keypair.slhdsa_secret_key)),
+            "Debug output should NOT contain raw SLH-DSA secret key"
+        );
+        assert!(
+            debug_output.contains("security-test@example.com"),
+            "Debug output should contain signer_id"
+        );
+        assert!(
+            debug_output.contains(&keypair.key_id),
+            "Debug output should contain key_id"
         );
     }
 
