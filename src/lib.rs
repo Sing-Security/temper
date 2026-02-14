@@ -50,5 +50,9 @@ pub use hardware_example::HardwareTrng;
 
 #[cfg(feature = "envelope")]
 pub use envelope::{Envelope, EnvelopeKeypair};
+#[cfg(feature = "envelope")]
+pub use envelope::{generate_envelope_keypair, encapsulate, decapsulate};
+#[cfg(feature = "envelope")]
+pub use envelope::{authenticated_encapsulate, authenticated_decapsulate};
 
 // endregion: --- Re-exports
