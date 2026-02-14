@@ -51,6 +51,9 @@ pub enum Error {
     // region:    --- Serialization Errors
     /// Serialization or deserialization failed
     Serialization(String),
+    
+    /// Compression or decompression failed
+    Compression(String),
     // endregion: --- Serialization Errors
 }
 

@@ -377,9 +377,14 @@ pub fn decapsulate(
 /// # Protocol
 ///
 /// 1. Create a `Seal` over the plaintext using sender's signing keypair
-/// 2. Serialize the seal to binary using postcard
-/// 3. Construct authenticated payload: `seal_length (u32 LE) || seal_bytes || plaintext`
+/// 2. Serialize and **compress** the seal to binary using postcard + DEFLATE
+/// 3. Construct authenticated payload: `seal_length (u32 LE) || compressed_seal_bytes || plaintext`
 /// 4. Encrypt the authenticated payload using hybrid KEM
+///
+/// # Compression
+///
+/// The seal is automatically compressed using DEFLATE (level 9) before encryption.
+/// This reduces the payload size for network transmission and embedded storage.
 ///
 /// # Arguments
 ///
@@ -410,9 +415,9 @@ pub fn authenticated_encapsulate(
     // Memory: authenticated envelope per problem statement — sign then encrypt pattern
     let seal = crate::seal::create_seal(rng, plaintext, sender_keypair, metadata)?;
     
-    // 2. Serialize seal to binary
-    let seal_bytes = postcard::to_allocvec(&seal)
-        .map_err(|e| Error::Serialization(format!("Failed to serialize seal: {}", e)))?;
+    // 2. Serialize and compress seal to binary
+    // Memory: compression optimization per problem statement — DEFLATE reduces SLH-DSA size by 30-50%
+    let seal_bytes = seal.to_compressed_bytes()?;
     
     // 3. Construct authenticated payload: seal_length || seal_bytes || plaintext
     let seal_length = seal_bytes.len() as u32;
@@ -433,9 +438,13 @@ pub fn authenticated_encapsulate(
 /// # Protocol
 ///
 /// 1. Decrypt the envelope using recipient's KEM keypair
-/// 2. Parse authenticated payload: `seal_length || seal_bytes || plaintext`
-/// 3. Deserialize the seal from binary
+/// 2. Parse authenticated payload: `seal_length || compressed_seal_bytes || plaintext`
+/// 3. **Decompress** and deserialize the seal from binary
 /// 4. Verify the seal against the plaintext using sender's public keys
+///
+/// # Decompression
+///
+/// The seal is automatically decompressed using DEFLATE before deserialization.
 ///
 /// # Arguments
 ///
@@ -483,9 +492,9 @@ pub fn authenticated_decapsulate(
     let seal_bytes = &authenticated_payload[4..4 + seal_length];
     let plaintext = &authenticated_payload[4 + seal_length..];
     
-    // 3. Deserialize seal
-    let seal: crate::seal::Seal = postcard::from_bytes(seal_bytes)
-        .map_err(|e| Error::Serialization(format!("Failed to deserialize seal: {}", e)))?;
+    // 3. Decompress and deserialize seal
+    // Memory: compression optimization per problem statement — decompress then deserialize
+    let seal = crate::seal::Seal::from_compressed_bytes(seal_bytes)?;
     
     // 4. Verify seal
     let verify_result = crate::seal::verify_seal(

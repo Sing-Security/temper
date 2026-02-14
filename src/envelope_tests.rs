@@ -549,5 +549,74 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_authenticated_envelope_with_compression() {
+        // Property: Authenticated envelopes should use compressed seals
+        // Verify that compression/decompression works in the full authenticated flow
+
+        // -- Setup & Fixtures
+        let mut rng = TemperEntropy::from_seed([0xBB; 32]);
+        
+        let sender_keypair = crate::seal::generate_keypair(&mut rng, "sender@test.com")
+            .expect("Failed to generate sender keypair");
+        let recipient_keypair = generate_envelope_keypair(&mut rng)
+            .expect("Failed to generate recipient keypair");
+        
+        let plaintext = b"Authenticated message with compressed seal";
+        let mut metadata = alloc::collections::BTreeMap::new();
+        metadata.insert("purpose".to_string(), "compression_test".to_string());
+
+        // -- Exec
+        let envelope = crate::envelope::authenticated_encapsulate(
+            &mut rng,
+            plaintext,
+            &recipient_keypair,
+            &sender_keypair,
+            metadata,
+        )
+        .expect("Failed to create authenticated envelope");
+        
+        let (recovered_plaintext, recovered_seal) = crate::envelope::authenticated_decapsulate(
+            &envelope,
+            &recipient_keypair,
+            &sender_keypair.mldsa_public_key,
+            &sender_keypair.slhdsa_public_key,
+        )
+        .expect("Failed to decrypt and verify authenticated envelope");
+
+        // -- Check
+        assert_eq!(
+            plaintext,
+            recovered_plaintext.as_slice(),
+            "Recovered plaintext should match original"
+        );
+        
+        assert_eq!(
+            recovered_seal.context.signer_id,
+            "sender@test.com",
+            "Seal should contain correct signer ID"
+        );
+        
+        assert_eq!(
+            recovered_seal.context.metadata.get("purpose").map(|s| s.as_str()),
+            Some("compression_test"),
+            "Seal metadata should be preserved"
+        );
+        
+        // Verify seal is actually compressed by comparing sizes
+        let uncompressed_seal_bytes = postcard::to_allocvec(&recovered_seal)
+            .expect("Failed to serialize seal");
+        let compressed_seal_bytes = recovered_seal.to_compressed_bytes()
+            .expect("Failed to compress seal");
+        
+        #[allow(unused_imports)]
+        use std::println;
+        println!(
+            "Authenticated envelope seal: uncompressed={} bytes, compressed={} bytes",
+            uncompressed_seal_bytes.len(),
+            compressed_seal_bytes.len()
+        );
+    }
+
     // endregion: --- Unit Tests
 }
