@@ -92,6 +92,12 @@ const DOMAIN_SEAL: &str = "Temper.Seal.v1";
 /// Tool version string.
 const TOOL_VERSION: &str = "temper-0.1.0";
 
+/// Threshold for parallel BLAKE3 hashing (1 MiB).
+/// Below this size, use single-threaded hashing; above it, use Rayon-based parallel hashing.
+/// Only applies when the `blake3_parallel` feature is enabled.
+#[cfg(feature = "blake3_parallel")]
+const PARALLEL_HASH_THRESHOLD: usize = 1024 * 1024;
+
 // endregion: --- Constants
 
 // region:    --- Data Structures
@@ -324,6 +330,49 @@ fn slhdsa_verify(pk: &[u8], message: &[u8], signature: &[u8]) -> bool {
 
 // endregion: --- Post-Quantum Signature Primitives
 
+// region:    --- Helper Functions
+
+/// Compute content hash with optional parallel processing.
+/// 
+/// Uses parallel BLAKE3 hashing when:
+/// - `blake3_parallel` feature is enabled
+/// - Content size >= 1 MiB threshold
+///
+/// # Memory: Performance optimization per problem statement
+/// - Single-threaded: Standard BLAKE3
+/// - Parallel: Rayon-based chunked hashing for large content
+#[inline]
+fn compute_content_hash(content: &[u8]) -> blake3::Hash {
+    #[cfg(feature = "blake3_parallel")]
+    {
+        if content.len() >= PARALLEL_HASH_THRESHOLD {
+            // Use Rayon-based parallel hashing for large content
+            use rayon::prelude::*;
+            
+            // Split content into chunks for parallel processing
+            const CHUNK_SIZE: usize = 256 * 1024; // 256 KiB chunks
+            
+            // Process chunks in parallel
+            let chunk_hashes: Vec<blake3::Hash> = content
+                .par_chunks(CHUNK_SIZE)
+                .map(|chunk| blake3::hash(chunk))
+                .collect();
+            
+            // Combine chunk hashes into final hash
+            let mut hasher = blake3::Hasher::new();
+            for chunk_hash in chunk_hashes {
+                hasher.update(chunk_hash.as_bytes());
+            }
+            return hasher.finalize();
+        }
+    }
+    
+    // Fall back to single-threaded hashing
+    blake3::hash(content)
+}
+
+// endregion: --- Helper Functions
+
 // region:    --- Public API
 
 /// Generate a new Temper keypair.
@@ -378,8 +427,9 @@ pub fn create_seal(
     keypair: &TemperKeypair,
     metadata: BTreeMap<String, String>,
 ) -> Result<Seal> {
-    // Compute content hash
-    let content_hash_bytes = blake3::hash(content);
+    // Compute content hash (uses parallel hashing for large content when blake3_parallel is enabled)
+    // Memory: performance optimization per problem statement — automatic parallelization
+    let content_hash_bytes = compute_content_hash(content);
     let content_hash = hex::encode(content_hash_bytes.as_bytes());
 
     // Create context
@@ -463,8 +513,9 @@ pub fn verify_seal(
     mldsa_pk: &[u8],
     slhdsa_pk: &[u8],
 ) -> Result<VerifyResult> {
-    // Check content hash
-    let actual_hash_bytes = blake3::hash(content);
+    // Check content hash (uses parallel hashing for large content when blake3_parallel is enabled)
+    // Memory: performance optimization per problem statement — automatic parallelization
+    let actual_hash_bytes = compute_content_hash(content);
     let actual_hash = hex::encode(actual_hash_bytes.as_bytes());
     let content_hash_valid = actual_hash == seal.content_hash;
 

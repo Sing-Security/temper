@@ -20,6 +20,9 @@ pub mod error;
 pub mod seal;
 pub mod envelope;
 
+#[cfg(feature = "hardware_example")]
+pub mod hardware_example;
+
 #[cfg(test)]
 #[path = "entropy_tests.rs"]
 mod entropy_tests;
@@ -37,5 +40,8 @@ pub use entropy_source::{EntropySource, EntropyError};
 pub use error::{Error, Result};
 pub use seal::{Seal, SealContext, SignatureBlock, TemperKeypair, VerifyResult};
 pub use seal::{generate_keypair, create_seal, verify_seal};
+
+#[cfg(feature = "hardware_example")]
+pub use hardware_example::HardwareTrng;
 
 // endregion: --- Re-exports

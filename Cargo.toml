@@ -16,6 +16,13 @@ default = ["std"]
 std = ["alloc", "blake3/std", "hex/std"]
 alloc = []
 
+# Performance features (std only)
+blake3_simd = ["std", "blake3/neon", "blake3/prefer_intrinsics"]
+blake3_parallel = ["blake3_simd", "dep:rayon"]
+
+# Hardware entropy example (optional, no_std compatible)
+hardware_example = []
+
 [dependencies]
 # -- Cryptography
 blake3 = { version = "1", default-features = false }
@@ -45,8 +52,18 @@ zeroize = { version = "1", default-features = false }
 # -- Error handling (no_std compatible proc-macro)
 derive_more = { version = "2", default-features = false, features = ["from", "display"] }
 
+# -- Parallel processing (optional, std only)
+rayon = { version = "1.10", optional = true }
+
 [dev-dependencies]
 rand = "0.8"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+# Benchmarks
+[[bench]]
+name = "seal_bench"
+harness = false
+required-features = ["std"]
 
 [profile.release]
 opt-level = "s"
@@ -54,3 +71,15 @@ lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
+
+# Speed-optimized profile for server deployments
+[profile.release-server]
+inherits = "release"
+opt-level = 3
+lto = "thin"
+strip = false  # Keep debug info for profiling
+
+[profile.bench]
+inherits = "release"
+opt-level = 3
+lto = "thin"
