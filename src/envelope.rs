@@ -73,7 +73,7 @@ use crate::error::{Error, Result};
 use rand_core::RngCore;
 use zeroize::Zeroize;
 
-use ml_kem::{kem::{Decapsulate, Encapsulate}, KemCore, MlKem1024, MlKem1024Params, Ciphertext};
+use ml_kem::{kem::{Decapsulate, Encapsulate}, KemCore, MlKem1024, MlKem1024Params, Ciphertext, EncodedSizeUser, Encoded};
 use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519SecretKey};
 use chacha20poly1305::{
     aead::{Aead, KeyInit},
@@ -176,9 +176,9 @@ pub fn generate_envelope_keypair(rng: &mut TemperEntropy) -> Result<EnvelopeKeyp
     // Generate ML-KEM-1024 keypair
     let (mlkem_dk, mlkem_ek) = MlKem1024::generate(rng);
 
-    // Extract bytes using the Into<Vec<u8>> trait
-    let mlkem_dk_bytes: Vec<u8> = mlkem_dk.into();
-    let mlkem_ek_bytes: Vec<u8> = mlkem_ek.into();
+    // Extract bytes using as_bytes() method
+    let mlkem_dk_bytes: Vec<u8> = mlkem_dk.as_bytes().to_vec();
+    let mlkem_ek_bytes: Vec<u8> = mlkem_ek.as_bytes().to_vec();
 
     // Generate X25519 keypair
     let (x25519_sk, x25519_pk) = x25519_keygen(rng);
@@ -216,8 +216,10 @@ pub fn encapsulate(
     keypair: &EnvelopeKeypair,
 ) -> Result<Envelope> {
     // Reconstruct ML-KEM encapsulation key from bytes
-    let mlkem_ek: ml_kem::kem::EncapsulationKey<MlKem1024Params> = keypair.mlkem_public_key.as_slice().try_into()
-        .map_err(|_| Error::CryptoError("Invalid ML-KEM public key bytes".into()))?;
+    let mlkem_ek_encoded: &Encoded<ml_kem::kem::EncapsulationKey<MlKem1024Params>> = 
+        keypair.mlkem_public_key.as_slice().try_into()
+            .map_err(|_| Error::CryptoError("Invalid ML-KEM public key bytes".into()))?;
+    let mlkem_ek = ml_kem::kem::EncapsulationKey::<MlKem1024Params>::from_bytes(mlkem_ek_encoded);
     
     // 1. ML-KEM-1024 encapsulation using reconstructed key
     let (mlkem_ct, mlkem_ss) = mlkem_ek.encapsulate(rng)
@@ -273,7 +275,7 @@ pub fn encapsulate(
 
     Ok(Envelope {
         schema_version: SCHEMA_VERSION,
-        mlkem_ciphertext: mlkem_ct.into(),
+        mlkem_ciphertext: mlkem_ct.to_vec(),
         x25519_ephemeral_public: x25519_ephemeral_pk_bytes,
         ciphertext,
         nonce: nonce_bytes.to_vec(),
@@ -296,8 +298,10 @@ pub fn decapsulate(
     keypair: &EnvelopeKeypair,
 ) -> Result<Vec<u8>> {
     // Reconstruct ML-KEM decapsulation key from bytes
-    let mlkem_dk: ml_kem::kem::DecapsulationKey<MlKem1024Params> = keypair.mlkem_secret_key.as_slice().try_into()
-        .map_err(|_| Error::CryptoError("Invalid ML-KEM secret key bytes".into()))?;
+    let mlkem_dk_encoded: &Encoded<ml_kem::kem::DecapsulationKey<MlKem1024Params>> = 
+        keypair.mlkem_secret_key.as_slice().try_into()
+            .map_err(|_| Error::CryptoError("Invalid ML-KEM secret key bytes".into()))?;
+    let mlkem_dk = ml_kem::kem::DecapsulationKey::<MlKem1024Params>::from_bytes(mlkem_dk_encoded);
     
     // 1. ML-KEM-1024 decapsulation using reconstructed key
     // Convert bytes to ciphertext reference
