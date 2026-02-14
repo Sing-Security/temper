@@ -67,6 +67,8 @@
 use alloc::vec::Vec;
 #[cfg(feature = "alloc")]
 use alloc::string::String;
+#[cfg(feature = "alloc")]
+use alloc::format;
 
 use crate::entropy::TemperEntropy;
 use crate::error::{Error, Result};
@@ -108,7 +110,10 @@ const COMBINED_SS_SIZE: usize = MLKEM_SS_SIZE + X25519_SS_SIZE;
 ///
 /// **Note**: Keys are stored as raw bytes for serialization compatibility.
 /// The typed ML-KEM keys are reconstructed from bytes when needed for operations.
-#[derive(Debug, Clone)]
+///
+/// **Security Note**: This struct implements a custom `Debug` trait that redacts secret keys
+/// to prevent accidental leakage in logs.
+#[derive(Clone)]
 pub struct EnvelopeKeypair {
     /// Schema version for future compatibility.
     pub schema_version: u16,
@@ -133,6 +138,20 @@ impl Drop for EnvelopeKeypair {
     fn drop(&mut self) {
         self.mlkem_secret_key.zeroize();
         self.x25519_secret_key.zeroize();
+    }
+}
+
+// Memory: security fix per problem statement — prevent private key leaks in logs
+impl core::fmt::Debug for EnvelopeKeypair {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("EnvelopeKeypair")
+            .field("schema_version", &self.schema_version)
+            .field("mlkem_secret_key", &"<REDACTED>")
+            .field("mlkem_public_key", &format!("<{} bytes>", self.mlkem_public_key.len()))
+            .field("x25519_secret_key", &"<REDACTED>")
+            .field("x25519_public_key", &format!("<{} bytes>", self.x25519_public_key.len()))
+            .field("key_id", &self.key_id)
+            .finish()
     }
 }
 
@@ -348,6 +367,141 @@ pub fn decapsulate(
         .map_err(|_| Error::CryptoError("ChaCha20-Poly1305 decryption failed (authentication tag mismatch)".into()))?;
 
     Ok(plaintext)
+}
+
+/// Encapsulate plaintext with sender authentication (sign then encrypt).
+///
+/// This function combines the seal and envelope protocols to provide both
+/// confidentiality (via encryption) and sender authenticity (via signatures).
+///
+/// # Protocol
+///
+/// 1. Create a `Seal` over the plaintext using sender's signing keypair
+/// 2. Serialize the seal to binary using postcard
+/// 3. Construct authenticated payload: `seal_length (u32 LE) || seal_bytes || plaintext`
+/// 4. Encrypt the authenticated payload using hybrid KEM
+///
+/// # Arguments
+///
+/// * `rng` - Cryptographically secure random number generator
+/// * `plaintext` - Data to encrypt and authenticate
+/// * `recipient_keypair` - Recipient's envelope keypair (for encryption)
+/// * `sender_keypair` - Sender's signing keypair (for authentication)
+/// * `metadata` - User-provided metadata for the seal
+///
+/// # Returns
+///
+/// An `Envelope` containing the encrypted and authenticated data.
+///
+/// # Security
+///
+/// The seal binds the plaintext to the sender's identity, preventing anonymous messages.
+/// Both encryption and signature verification must succeed for the message to be considered valid.
+pub fn authenticated_encapsulate(
+    rng: &mut crate::entropy::TemperEntropy,
+    plaintext: &[u8],
+    recipient_keypair: &EnvelopeKeypair,
+    sender_keypair: &crate::seal::TemperKeypair,
+    metadata: alloc::collections::BTreeMap<String, String>,
+) -> Result<Envelope> {
+    use alloc::vec::Vec;
+    
+    // 1. Create seal over plaintext
+    // Memory: authenticated envelope per problem statement — sign then encrypt pattern
+    let seal = crate::seal::create_seal(rng, plaintext, sender_keypair, metadata)?;
+    
+    // 2. Serialize seal to binary
+    let seal_bytes = postcard::to_allocvec(&seal)
+        .map_err(|e| Error::Serialization(format!("Failed to serialize seal: {}", e)))?;
+    
+    // 3. Construct authenticated payload: seal_length || seal_bytes || plaintext
+    let seal_length = seal_bytes.len() as u32;
+    let mut authenticated_payload = Vec::with_capacity(4 + seal_bytes.len() + plaintext.len());
+    authenticated_payload.extend_from_slice(&seal_length.to_le_bytes());
+    authenticated_payload.extend_from_slice(&seal_bytes);
+    authenticated_payload.extend_from_slice(plaintext);
+    
+    // 4. Encrypt the authenticated payload
+    encapsulate(rng, &authenticated_payload, recipient_keypair)
+}
+
+/// Decapsulate and verify an authenticated envelope (decrypt then verify).
+///
+/// This function reverses the `authenticated_encapsulate` operation, providing
+/// both confidentiality (decryption) and sender verification (signature check).
+///
+/// # Protocol
+///
+/// 1. Decrypt the envelope using recipient's KEM keypair
+/// 2. Parse authenticated payload: `seal_length || seal_bytes || plaintext`
+/// 3. Deserialize the seal from binary
+/// 4. Verify the seal against the plaintext using sender's public keys
+///
+/// # Arguments
+///
+/// * `envelope` - The authenticated envelope to decrypt and verify
+/// * `recipient_keypair` - Recipient's envelope keypair (for decryption)
+/// * `sender_mldsa_pk` - Sender's ML-DSA-65 public key (for verification)
+/// * `sender_slhdsa_pk` - Sender's SLH-DSA public key (for verification)
+///
+/// # Returns
+///
+/// A tuple of `(plaintext, seal)` if decryption and verification both succeed.
+/// Returns error if decryption fails or signature verification fails.
+///
+/// # Security
+///
+/// Both the envelope decryption AND seal verification must succeed.
+/// This ensures the message came from the claimed sender and was not tampered with.
+pub fn authenticated_decapsulate(
+    envelope: &Envelope,
+    recipient_keypair: &EnvelopeKeypair,
+    sender_mldsa_pk: &[u8],
+    sender_slhdsa_pk: &[u8],
+) -> Result<(Vec<u8>, crate::seal::Seal)> {
+    
+    // 1. Decrypt the envelope
+    // Memory: authenticated envelope per problem statement — decrypt then verify pattern
+    let authenticated_payload = decapsulate(envelope, recipient_keypair)?;
+    
+    // 2. Parse authenticated payload
+    if authenticated_payload.len() < 4 {
+        return Err(Error::CryptoError("Authenticated payload too short".into()));
+    }
+    
+    let seal_length = u32::from_le_bytes([
+        authenticated_payload[0],
+        authenticated_payload[1],
+        authenticated_payload[2],
+        authenticated_payload[3],
+    ]) as usize;
+    
+    if authenticated_payload.len() < 4 + seal_length {
+        return Err(Error::CryptoError("Invalid seal length in authenticated payload".into()));
+    }
+    
+    let seal_bytes = &authenticated_payload[4..4 + seal_length];
+    let plaintext = &authenticated_payload[4 + seal_length..];
+    
+    // 3. Deserialize seal
+    let seal: crate::seal::Seal = postcard::from_bytes(seal_bytes)
+        .map_err(|e| Error::Serialization(format!("Failed to deserialize seal: {}", e)))?;
+    
+    // 4. Verify seal
+    let verify_result = crate::seal::verify_seal(
+        plaintext,
+        &seal,
+        sender_mldsa_pk,
+        sender_slhdsa_pk,
+    )?;
+    
+    if !verify_result.valid {
+        return Err(Error::InvalidSignature(
+            "Seal verification failed: message not authenticated by sender".into()
+        ));
+    }
+    
+    Ok((plaintext.to_vec(), seal))
 }
 
 // endregion: --- Public API

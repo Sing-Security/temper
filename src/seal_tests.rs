@@ -9,6 +9,7 @@ mod tests {
     use alloc::collections::BTreeMap;
     use alloc::string::{String, ToString};
     use alloc::vec;
+    use alloc::format;
 
     // region:    --- Integration Tests
 
@@ -142,12 +143,12 @@ mod tests {
             content_hash: "0123456789abcdef".to_string(),
             primary: crate::seal::SignatureBlock {
                 algorithm: "ML-DSA-65".to_string(),
-                signature: "aabbccdd".to_string(),
+                signature: vec![0xaa, 0xbb, 0xcc, 0xdd],
                 key_id: "key1".to_string(),
             },
             backup: crate::seal::SignatureBlock {
                 algorithm: "SLH-DSA".to_string(),
-                signature: "eeffgghh".to_string(),
+                signature: vec![0xee, 0xff, 0x00, 0x11],
                 key_id: "key2".to_string(),
             },
             context: SealContext {
@@ -162,14 +163,15 @@ mod tests {
 
         // -- Exec
         // Memory: updated to match new seal_id computation in create_seal
+        // Memory: signatures are now Vec<u8>, use slice directly instead of as_bytes()
         let mut hasher1 = blake3::Hasher::new();
         hasher1.update(&seal.schema_version.to_le_bytes());
         hasher1.update(seal.content_hash.as_bytes());
         hasher1.update(seal.primary.algorithm.as_bytes());
-        hasher1.update(seal.primary.signature.as_bytes());
+        hasher1.update(&seal.primary.signature);
         hasher1.update(seal.primary.key_id.as_bytes());
         hasher1.update(seal.backup.algorithm.as_bytes());
-        hasher1.update(seal.backup.signature.as_bytes());
+        hasher1.update(&seal.backup.signature);
         hasher1.update(seal.backup.key_id.as_bytes());
         let context_bytes1 = postcard::to_allocvec(&seal.context)
             .expect("Failed to serialize context");
@@ -180,10 +182,10 @@ mod tests {
         hasher2.update(&seal.schema_version.to_le_bytes());
         hasher2.update(seal.content_hash.as_bytes());
         hasher2.update(seal.primary.algorithm.as_bytes());
-        hasher2.update(seal.primary.signature.as_bytes());
+        hasher2.update(&seal.primary.signature);
         hasher2.update(seal.primary.key_id.as_bytes());
         hasher2.update(seal.backup.algorithm.as_bytes());
-        hasher2.update(seal.backup.signature.as_bytes());
+        hasher2.update(&seal.backup.signature);
         hasher2.update(seal.backup.key_id.as_bytes());
         let context_bytes2 = postcard::to_allocvec(&seal.context)
             .expect("Failed to serialize context");
@@ -212,12 +214,12 @@ mod tests {
             content_hash: "fedcba9876543210".to_string(),
             primary: crate::seal::SignatureBlock {
                 algorithm: "ML-DSA-65".to_string(),
-                signature: "sig1".to_string(),
+                signature: vec![0x01, 0x02, 0x03],
                 key_id: "keyid1".to_string(),
             },
             backup: crate::seal::SignatureBlock {
                 algorithm: "SLH-DSA".to_string(),
-                signature: "sig2".to_string(),
+                signature: vec![0x04, 0x05, 0x06],
                 key_id: "keyid2".to_string(),
             },
             context: SealContext {
@@ -311,10 +313,10 @@ mod tests {
         hasher.update(&seal.schema_version.to_le_bytes());
         hasher.update(seal.content_hash.as_bytes());
         hasher.update(seal.primary.algorithm.as_bytes());
-        hasher.update(seal.primary.signature.as_bytes());
+        hasher.update(&seal.primary.signature);
         hasher.update(seal.primary.key_id.as_bytes());
         hasher.update(seal.backup.algorithm.as_bytes());
-        hasher.update(seal.backup.signature.as_bytes());
+        hasher.update(&seal.backup.signature);
         hasher.update(seal.backup.key_id.as_bytes());
         hasher.update(&context_bytes);
         let computed_seal_id = hex::encode(hasher.finalize().as_bytes());
@@ -364,6 +366,58 @@ mod tests {
             hash1_large.as_bytes(),
             "Different content should produce different hashes"
         );
+    }
+
+    #[test]
+    fn test_keypair_debug_redacts_secrets() {
+        // Property: Debug output should redact secret keys to prevent accidental logging
+        // Memory: security fix per problem statement — verify Debug redaction
+        
+        // -- Setup & Fixtures
+        let mut rng = TemperEntropy::from_seed([0x70; 32]);
+        let keypair = generate_keypair(&mut rng, "security-test@example.com")
+            .expect("Failed to generate keypair");
+        
+        // -- Exec
+        let debug_output = format!("{:?}", keypair);
+        
+        // -- Check
+        // Verify redacted markers are present
+        assert!(
+            debug_output.contains("<REDACTED>"),
+            "Debug output should contain <REDACTED> for secret keys"
+        );
+        
+        // Verify secret key field names are present but values are redacted
+        assert!(
+            debug_output.contains("mldsa_secret_key") && debug_output.contains("<REDACTED>"),
+            "Debug output should show mldsa_secret_key field as redacted"
+        );
+        assert!(
+            debug_output.contains("slhdsa_secret_key") && debug_output.contains("<REDACTED>"),
+            "Debug output should show slhdsa_secret_key field as redacted"
+        );
+        
+        // Verify non-secret fields are still present
+        assert!(
+            debug_output.contains("security-test@example.com"),
+            "Debug output should contain signer_id"
+        );
+        assert!(
+            debug_output.contains(&keypair.key_id),
+            "Debug output should contain key_id"
+        );
+        
+        // Verify output doesn't contain raw byte array patterns like "[" or decimal numbers
+        // that would indicate secret key bytes are exposed
+        let secret_indicators = ["mldsa_secret_key: [", "slhdsa_secret_key: ["];
+        for indicator in &secret_indicators {
+            assert!(
+                !debug_output.contains(indicator),
+                "Debug output should not contain raw secret key bytes pattern: {}",
+                indicator
+            );
+        }
     }
 
     // endregion: --- Unit Tests

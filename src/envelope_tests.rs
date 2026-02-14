@@ -8,6 +8,7 @@ mod tests {
     use crate::entropy::TemperEntropy;
     use alloc::vec;
     use alloc::string::ToString;
+    use alloc::format;
 
     // region:    --- Integration Tests
 
@@ -337,6 +338,215 @@ mod tests {
             "Empty plaintext should be recovered correctly"
         );
         assert_eq!(recovered.len(), 0, "Recovered should be empty");
+    }
+
+    #[test]
+    fn test_envelope_keypair_debug_redacts_secrets() {
+        // Property: Debug output should redact secret keys to prevent accidental logging
+        // Memory: security fix per problem statement — verify Debug redaction
+        
+        // -- Setup & Fixtures
+        let mut rng = TemperEntropy::from_seed([0x71; 32]);
+        let keypair = generate_envelope_keypair(&mut rng)
+            .expect("Failed to generate envelope keypair");
+        
+        // -- Exec
+        let debug_output = format!("{:?}", keypair);
+        
+        // -- Check
+        // Verify redacted markers are present
+        assert!(
+            debug_output.contains("<REDACTED>"),
+            "Debug output should contain <REDACTED> for secret keys"
+        );
+        
+        // Verify secret key field names are present but values are redacted
+        assert!(
+            debug_output.contains("mlkem_secret_key") && debug_output.contains("<REDACTED>"),
+            "Debug output should show mlkem_secret_key field as redacted"
+        );
+        assert!(
+            debug_output.contains("x25519_secret_key") && debug_output.contains("<REDACTED>"),
+            "Debug output should show x25519_secret_key field as redacted"
+        );
+        
+        // Verify non-secret fields are still present
+        assert!(
+            debug_output.contains(&keypair.key_id),
+            "Debug output should contain key_id"
+        );
+        
+        // Verify output doesn't contain raw byte array patterns
+        let secret_indicators = ["mlkem_secret_key: [", "x25519_secret_key: ["];
+        for indicator in &secret_indicators {
+            assert!(
+                !debug_output.contains(indicator),
+                "Debug output should not contain raw secret key bytes pattern: {}",
+                indicator
+            );
+        }
+    }
+
+    #[test]
+    fn test_authenticated_envelope_roundtrip() {
+        // Property: Authenticated encapsulate and decapsulate should recover plaintext and verify sender
+        // Memory: authenticated envelope per problem statement — sign then encrypt pattern
+        
+        // -- Setup & Fixtures
+        let mut rng = TemperEntropy::from_seed([0x72; 32]);
+        
+        // Generate recipient's envelope keypair
+        let recipient_keypair = generate_envelope_keypair(&mut rng)
+            .expect("Failed to generate recipient envelope keypair");
+        
+        // Generate sender's signing keypair
+        let sender_keypair = crate::seal::generate_keypair(&mut rng, "sender@example.com")
+            .expect("Failed to generate sender signing keypair");
+        
+        let plaintext = b"Authenticated secret message";
+        let mut metadata = alloc::collections::BTreeMap::new();
+        metadata.insert("purpose".to_string(), "test".to_string());
+        
+        // -- Exec
+        let envelope = crate::envelope::authenticated_encapsulate(
+            &mut rng,
+            plaintext,
+            &recipient_keypair,
+            &sender_keypair,
+            metadata,
+        )
+        .expect("Failed to create authenticated envelope");
+        
+        let (recovered_plaintext, seal) = crate::envelope::authenticated_decapsulate(
+            &envelope,
+            &recipient_keypair,
+            &sender_keypair.mldsa_public_key,
+            &sender_keypair.slhdsa_public_key,
+        )
+        .expect("Failed to decrypt and verify authenticated envelope");
+        
+        // -- Check
+        assert_eq!(
+            plaintext,
+            recovered_plaintext.as_slice(),
+            "Recovered plaintext should match original"
+        );
+        assert_eq!(
+            seal.context.signer_id,
+            "sender@example.com",
+            "Seal should contain sender ID"
+        );
+        assert!(
+            seal.context.metadata.contains_key("purpose"),
+            "Seal should contain metadata"
+        );
+    }
+
+    #[test]
+    fn test_authenticated_envelope_wrong_sender_fails() {
+        // Property: Verifying with wrong sender keys should fail
+        // Memory: authenticated envelope per problem statement — dual signature verification
+        
+        // -- Setup & Fixtures
+        let mut rng = TemperEntropy::from_seed([0x73; 32]);
+        
+        let recipient_keypair = generate_envelope_keypair(&mut rng)
+            .expect("Failed to generate recipient envelope keypair");
+        
+        let sender_keypair = crate::seal::generate_keypair(&mut rng, "alice@example.com")
+            .expect("Failed to generate sender signing keypair");
+        
+        let wrong_sender_keypair = crate::seal::generate_keypair(&mut rng, "bob@example.com")
+            .expect("Failed to generate wrong sender signing keypair");
+        
+        let plaintext = b"Authenticated message from Alice";
+        
+        // -- Exec
+        let envelope = crate::envelope::authenticated_encapsulate(
+            &mut rng,
+            plaintext,
+            &recipient_keypair,
+            &sender_keypair,
+            alloc::collections::BTreeMap::new(),
+        )
+        .expect("Failed to create authenticated envelope");
+        
+        let result = crate::envelope::authenticated_decapsulate(
+            &envelope,
+            &recipient_keypair,
+            &wrong_sender_keypair.mldsa_public_key,
+            &wrong_sender_keypair.slhdsa_public_key,
+        );
+        
+        // -- Check
+        assert!(
+            result.is_err(),
+            "Decapsulation with wrong sender keys should fail"
+        );
+        
+        // Verify it's specifically a signature verification failure
+        if let Err(e) = result {
+            let error_msg = format!("{}", e);
+            assert!(
+                error_msg.contains("Seal verification failed") || error_msg.contains("not authenticated"),
+                "Error should indicate signature verification failure, got: {}",
+                error_msg
+            );
+        }
+    }
+
+    #[test]
+    fn test_authenticated_envelope_tampered_plaintext_fails() {
+        // Property: Tampering with plaintext should fail seal verification
+        // Memory: authenticated envelope per problem statement — content hash binding
+        
+        // -- Setup & Fixtures
+        let mut rng = TemperEntropy::from_seed([0x74; 32]);
+        
+        let recipient_keypair = generate_envelope_keypair(&mut rng)
+            .expect("Failed to generate recipient envelope keypair");
+        
+        let sender_keypair = crate::seal::generate_keypair(&mut rng, "sender@example.com")
+            .expect("Failed to generate sender signing keypair");
+        
+        let original_plaintext = b"Original message";
+        
+        // -- Exec
+        // Create a seal for different plaintext
+        let tampered_plaintext = b"Tampered message";
+        let seal = crate::seal::create_seal(
+            &mut rng,
+            original_plaintext,
+            &sender_keypair,
+            alloc::collections::BTreeMap::new(),
+        )
+        .expect("Failed to create seal");
+        
+        // Manually construct mismatched payload: seal for original, but plaintext is tampered
+        let seal_bytes = postcard::to_allocvec(&seal)
+            .expect("Failed to serialize seal");
+        let seal_length = seal_bytes.len() as u32;
+        let mut mismatched_payload = vec![];
+        mismatched_payload.extend_from_slice(&seal_length.to_le_bytes());
+        mismatched_payload.extend_from_slice(&seal_bytes);
+        mismatched_payload.extend_from_slice(tampered_plaintext);
+        
+        // Re-encrypt with mismatched payload
+        let envelope = crate::envelope::encapsulate(&mut rng, &mismatched_payload, &recipient_keypair)
+            .expect("Failed to re-encrypt");
+        
+        let result = crate::envelope::authenticated_decapsulate(
+            &envelope,
+            &recipient_keypair,
+            &sender_keypair.mldsa_public_key,
+            &sender_keypair.slhdsa_public_key,
+        );
+        
+        // -- Check
+        assert!(
+            result.is_err(),
+            "Decapsulation with tampered plaintext should fail seal verification"
+        );
     }
 
     // endregion: --- Unit Tests
