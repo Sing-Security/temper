@@ -20,6 +20,9 @@ alloc = []
 blake3_simd = ["std", "blake3/neon", "blake3/prefer_intrinsics"]
 blake3_parallel = ["blake3_simd", "dep:rayon"]
 
+# Hybrid KEM/AEAD (optional, no_std + alloc compatible)
+envelope = ["dep:ml-kem", "dep:x25519-dalek", "dep:chacha20poly1305"]
+
 # Hardware entropy example (optional, no_std compatible)
 hardware_example = []
 
@@ -28,6 +31,11 @@ hardware_example = []
 blake3 = { version = "1", default-features = false }
 ml-dsa = { version = "0.1.0-rc.7", default-features = false, features = ["zeroize"] }
 slh-dsa = { version = "0.2.0-rc.4", default-features = false, features = ["zeroize"] }
+
+# -- Hybrid KEM/AEAD (optional)
+ml-kem = { version = "0.2.0-rc.2", default-features = false, optional = true }
+x25519-dalek = { version = "2", default-features = false, features = ["static_secrets", "zeroize"], optional = true }
+chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc"], optional = true }
 
 # -- DRBG
 rand_chacha = { version = "0.3", default-features = false }

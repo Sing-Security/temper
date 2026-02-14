@@ -31,6 +31,10 @@ mod entropy_tests;
 #[path = "seal_tests.rs"]
 mod seal_tests;
 
+#[cfg(all(test, feature = "envelope"))]
+#[path = "envelope_tests.rs"]
+mod envelope_tests;
+
 // endregion: --- Modules
 
 // region:    --- Re-exports
@@ -43,5 +47,8 @@ pub use seal::{generate_keypair, create_seal, verify_seal};
 
 #[cfg(feature = "hardware_example")]
 pub use hardware_example::HardwareTrng;
+
+#[cfg(feature = "envelope")]
+pub use envelope::{Envelope, EnvelopeKeypair};
 
 // endregion: --- Re-exports
