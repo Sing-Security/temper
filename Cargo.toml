@@ -26,9 +26,6 @@ envelope = ["dep:ml-kem", "dep:x25519-dalek", "dep:chacha20poly1305"]
 # Hardware entropy example (optional, no_std compatible)
 hardware_example = []
 
-# Queue-CBL: Valkey-like stream and pub/sub message broker (no_std + alloc compatible)
-queue = ["alloc"]
-
 [dependencies]
 # -- Cryptography
 blake3 = { version = "1", default-features = false }

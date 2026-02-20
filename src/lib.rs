@@ -21,9 +21,6 @@ pub mod crypto_provider;
 pub mod seal;
 pub mod envelope;
 
-#[cfg(feature = "queue")]
-pub mod queue;
-
 #[cfg(feature = "std")]
 pub mod plugins;
 
@@ -41,10 +38,6 @@ mod seal_tests;
 #[cfg(all(test, feature = "envelope"))]
 #[path = "envelope_tests.rs"]
 mod envelope_tests;
-
-#[cfg(all(test, feature = "queue"))]
-#[path = "queue_tests.rs"]
-mod queue_tests;
 
 // endregion: --- Modules
 
@@ -66,8 +59,5 @@ pub use envelope::{Envelope, EnvelopeKeypair};
 pub use envelope::{generate_envelope_keypair, encapsulate, decapsulate};
 #[cfg(feature = "envelope")]
 pub use envelope::{authenticated_encapsulate, authenticated_decapsulate};
-
-#[cfg(feature = "queue")]
-pub use queue::{QueueManager, QueueOp, BackpressurePolicy, QueueError};
 
 // endregion: --- Re-exports
