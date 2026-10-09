@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
 #
 # Refresh this tree from the temper crate inside a CrucibleOS checkout, where
-# the crate is developed. Everything copies verbatim except one line: the
-# package name. This repository publishes the crate as `temper-protocol`
-# because crates.io's `temper` belongs to someone else; CrucibleOS develops
-# it as `temper`, and every consumer there uses path dependencies, so the
-# public name exists only here. The rename is applied by this script rather
-# than left to memory — a refresh that forgets it does not fail silently:
-# `cargo publish` refuses to overwrite someone else's crate.
+# the crate is developed. The copy is verbatim: both trees carry the same
+# package name (`temper-rs` — crates.io's `temper` belongs to an unrelated
+# project) and the same library name (`temper`), so nothing is transformed
+# here and nothing can drift apart by a rename forgotten on one side.
 #
 #   scripts/refresh-from-crucibleos.sh [PATH_TO_CRUCIBLEOS]
 #
@@ -41,20 +38,14 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 rsync -a --delete \
 	--exclude .git/ \
 	--exclude target/ \
+	--exclude Cargo.lock \
 	--exclude scripts/ \
 	"$CRATE/" .
 
-# Two edits, one intent: the package publishes as `temper-protocol`, while the
-# library target keeps the name `temper`. The second line is load-bearing —
-# without it the lib target defaults to the package name and every
-# `use temper::` in the examples, benches, and any consumer breaks.
-sed -i -e 's/^name = "temper"$/name = "temper-protocol"/' \
-	-e 's/^\[lib\]$/[lib]\nname = "temper"/' Cargo.toml
-
-if [ "$(sed -n 's/^name = "\(.*\)"$/\1/p' Cargo.toml | head -1)" != "temper-protocol" ]; then
-	echo "rename failed — Cargo.toml does not carry the publish name" >&2
-	exit 2
-fi
+# The in-tree directory has no lock of its own; regenerate one for this
+# standalone build so `--locked` invocations and the committed lock stay
+# meaningful.
+cargo metadata --format-version 1 > /dev/null
 
 echo "refreshed from $CRATE"
 git status --short
