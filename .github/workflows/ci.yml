@@ -1,0 +1,87 @@
+# .github/workflows/ci.yml
+#
+# Temper is developed as a path dependency inside the CrucibleOS workspace, which
+# patches blake3/ml-dsa/sha2 and friends to in-tree vendored crates via
+# [patch.crates-io]. That means an in-tree build never proves the crate is
+# publishable: it can compile against replacements that no external consumer has.
+# These jobs build against stock crates.io, which is the only thing an in-tree
+# build cannot check.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: test (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # One entry per declared feature, plus `--all-features`. Features that
+        # only ever appear in the all-on build can hide a defect that the
+        # all-on build masks — `std` without `signatures` was broken for
+        # exactly that reason.
+        include:
+          - { name: default,        flags: "" }
+          - { name: alloc,          flags: "--no-default-features --features alloc" }
+          - { name: std,            flags: "--no-default-features --features std" }
+          - { name: signatures,     flags: "--no-default-features --features alloc,signatures" }
+          - { name: envelope,       flags: "--no-default-features --features alloc,envelope" }
+          - { name: session,        flags: "--no-default-features --features alloc,session" }
+          - { name: keychain,       flags: "--no-default-features --features alloc,keychain" }
+          - { name: hardware,       flags: "--no-default-features --features alloc,hardware_example" }
+          - { name: compression,    flags: "--no-default-features --features alloc,signatures,compression" }
+          - { name: user-getrandom, flags: "--no-default-features --features alloc,crucible-user-getrandom" }
+          - { name: blake3-simd,    flags: "--no-default-features --features blake3_simd" }
+          - { name: blake3-parallel,flags: "--no-default-features --features blake3_parallel" }
+          - { name: transport,      flags: "--no-default-features --features transport" }
+          - { name: all,            flags: "--all-features" }
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show
+      - run: cargo test ${{ matrix.flags }}
+
+  # A feature declared but compiled by no job is how breakage hides. Fail if one
+  # is added to Cargo.toml and not to the matrix above.
+  matrix-covers-every-feature:
+    name: every declared feature is in the matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        run: |
+          set -euo pipefail
+          declared=$(sed -n '/^\[features\]/,/^\[/p' Cargo.toml \
+                     | grep -oE '^[a-z0-9_-]+ = ' | sed 's/ = //' | sort -u)
+          covered=$(grep -oE -e '--features [a-z0-9_,-]+' -e '--all-features' .github/workflows/ci.yml \
+                    | tr ',' '\n' | grep -oE '[a-z0-9_-]+$' | sort -u)
+          exempt=$(printf 'default\nall-features\n')
+          missing=$(comm -23 <(echo "$declared") <(sort -u <(echo "$covered") <(echo "$exempt")))
+          if [ -n "$missing" ]; then
+            echo "::error::Declared but never compiled:"
+            echo "$missing" | sed 's/^/  - /'
+            exit 1
+          fi
+          echo "All declared features are covered."
+
+  lint:
+    name: fmt + clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup component add rustfmt clippy
+      - run: cargo fmt --all --check
+      # --all-targets so the test, example and bench code is linted too. Without
+      # it clippy only sees the library, which is the smaller half of the tree.
+      # undocumented_unsafe_blocks is off by default; it is the lint that keeps
+      # the unsafe blocks in keychain/DelegationToken and the getrandom syscall
+      # justified rather than merely present.
+      - run: cargo clippy --all-features --all-targets -- -D warnings -D clippy::undocumented_unsafe_blocks
