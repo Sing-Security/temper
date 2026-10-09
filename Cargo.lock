@@ -1336,7 +1336,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "temper"
+name = "temper-protocol"
 version = "0.5.0"
 dependencies = [
  "blake3",
