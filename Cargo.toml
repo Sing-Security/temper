@@ -3,10 +3,10 @@
 # project. The library target below keeps the name `temper`, so the rename
 # never leaks past the manifest.
 name = "temper-rs"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 rust-version = "1.89"
-description = "Temper — Quantum-safe cryptographic protocol with hardened entropy and dual PQC signatures. Fully no_std for embedded."
+description = "Temper - Quantum-safe cryptographic protocol with hardened entropy and dual PQC signatures. Fully no_std for embedded."
 license = "Apache-2.0"
 repository = "https://github.com/Sing-Security/temper"
 readme = "README.md"
@@ -19,7 +19,7 @@ doctest = false
 
 [lints.rust]
 # `deny`, not the usual `forbid`: the GetRandom syscall path (no_std userspace
-# CBLs) is irreducible inline asm — see src/getrandom_custom.rs, which carries a
+# CBLs) is irreducible inline asm - see src/getrandom_custom.rs, which carries a
 # targeted `#[allow(unsafe_code)]`. `forbid` would delete that path outright.
 unsafe_code = "deny"
 # unused = { level = "allow", priority = -1 } # For exploratory dev.
@@ -30,7 +30,7 @@ std = ["alloc", "hex/std", "compression"]
 alloc = []  # blake3/pure is now in dependencies section directly
 compression = ["dep:flate2"]
 signatures = ["dep:ml-dsa", "dep:slh-dsa"]
-keychain = []  # CapKeychain + DelegationToken — only requires blake3, already in deps
+keychain = []  # CapKeychain + DelegationToken - only requires blake3, already in deps
 
 # Performance features (std only - incompatible with bare-metal)
 blake3_simd = ["std", ]
@@ -41,7 +41,7 @@ envelope = ["signatures", "dep:ml-kem", "dep:x25519-dalek", "dep:chacha20poly130
 
 # Authenticated session protocol (no_std + alloc): transcript-signed
 # three-flight handshake over the `handshake` primitives, plus the record
-# layer (`record.rs`) — ChaCha20-Poly1305 with counter nonces. The `ca`
+# layer (`record.rs`) - ChaCha20-Poly1305 with counter nonces. The `ca`
 # module rides in via `signatures` for certificate-based peer policies.
 session = ["envelope"]
 
@@ -49,7 +49,7 @@ session = ["envelope"]
 hardware_example = []
 
 # CrucibleOS userspace entropy: route getrandom to the kernel CSPRNG via the
-# GetRandom (80) syscall. ONLY for userspace CBLs — never enable in the kernel
+# GetRandom (80) syscall. ONLY for userspace CBLs - never enable in the kernel
 # (it emits a ring-3 `syscall`/`svc` instruction). Without this, no_std builds
 # fall back to the zero-fill getrandom stub (deterministic DRBG seeds).
 crucible-user-getrandom = []
@@ -57,7 +57,7 @@ crucible-user-getrandom = []
 # Network transport (std only): length-prefixed framing ([u32 LE length]
 # [postcard payload]) over tokio's LengthDelimitedCodec, plus a tokio
 # client/server that runs the three session flights and then moves one
-# encrypted record per frame. Opt-in and implies `std` — every no_std
+# encrypted record per frame. Opt-in and implies `std` - every no_std
 # configuration of this crate is untouched, and tokio itself is std-only,
 # which is exactly why it lives behind this gate.
 transport = ["std", "session", "dep:tokio", "dep:tokio-util", "dep:futures-util", "dep:bytes"]
@@ -100,7 +100,7 @@ derive_more = { version = "2", default-features = false, features = ["from", "di
 [dev-dependencies]
 rand = "0.8"
 criterion = { version = "0.5", features = ["html_reports"] }
-# Frozen-layout asserts (DelegationToken ABI) — const-evaluated at test compile.
+# Frozen-layout asserts (DelegationToken ABI) - const-evaluated at test compile.
 static_assertions = "1"
 # Property round-trips for the six frozen serialization types.
 proptest = "1"
@@ -108,7 +108,7 @@ proptest = "1"
 # Benchmarks
 #
 # Every target below uses the seal/crypto-provider API, so `std` alone is not
-# enough — without `signatures` they compile against the stub types in lib.rs
+# enough - without `signatures` they compile against the stub types in lib.rs
 # and fail. `cargo test` builds these targets, so they are part of every job.
 
 [[bench]]
@@ -133,7 +133,7 @@ name = "c02-crypto-provider"
 required-features = ["std", "signatures"]
 
 [[example]]
-name = "c03-kernel-chain"
+name = "c03-escrow"
 required-features = ["std", "envelope"]
 
 # -- Build profiles

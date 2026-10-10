@@ -13,7 +13,7 @@ use temper::record::RecordKey;
 use temper::session::{self, PeerPolicy};
 use temper::{TemperEntropy, generate_keypair};
 
-/// Everything both sides of a handshake need, made once per group — keygen
+/// Everything both sides of a handshake need, made once per group - keygen
 /// (two PQ signature keys and the concealment key) is minutes of setup cost
 /// per run and is not what is being measured. The measured flights reseed
 /// their rngs from fixed seeds: the ephemerals repeat, which is fine for
@@ -35,7 +35,7 @@ fn peers() -> Peers {
 
 const ANY: PeerPolicy = PeerPolicy::AcceptAny;
 
-/// One full establishment — all four calls a session costs, both sides.
+/// One full establishment - all four calls a session costs, both sides.
 fn full_handshake(c: &mut Criterion) {
 	let mut group = c.benchmark_group("handshake");
 	group.throughput(Throughput::Elements(1));
@@ -57,14 +57,14 @@ fn full_handshake(c: &mut Criterion) {
 	group.finish();
 }
 
-/// The flights separately, each timed with its setup excluded — where the
+/// The flights separately, each timed with its setup excluded - where the
 /// milliseconds live (concealment, the two PQ signatures, the KEM) decides
 /// what is worth optimizing, and a single "full" number hides it.
 fn flight_by_flight(c: &mut Criterion) {
 	let mut group = c.benchmark_group("handshake_flight");
 	let p = peers();
 
-	// Flight 1 — the initiator's opening: concealment encapsulation plus the
+	// Flight 1 - the initiator's opening: concealment encapsulation plus the
 	// bare proposal.
 	group.bench_function("1_initiate", |b| {
 		b.iter_batched(
@@ -76,7 +76,7 @@ fn flight_by_flight(c: &mut Criterion) {
 		);
 	});
 
-	// Flight 2 — the responder's answer: cookie check, decapsulation, the
+	// Flight 2 - the responder's answer: cookie check, decapsulation, the
 	// bare handshake, and the two responder signatures.
 	group.bench_function("2_accept", |b| {
 		b.iter_batched(
@@ -94,7 +94,7 @@ fn flight_by_flight(c: &mut Criterion) {
 		);
 	});
 
-	// Flight 3 — the initiator's finish: responder signature verification,
+	// Flight 3 - the initiator's finish: responder signature verification,
 	// then the two initiator signatures.
 	group.bench_function("3_finalize_initiator", |b| {
 		b.iter_batched(
@@ -115,7 +115,7 @@ fn flight_by_flight(c: &mut Criterion) {
 		);
 	});
 
-	// Flight 4 — the responder's finish: MAC, then initiator verification.
+	// Flight 4 - the responder's finish: MAC, then initiator verification.
 	// No rng: this side signs nothing, it only verifies.
 	group.bench_function("4_finalize_responder", |b| {
 		b.iter_batched(
@@ -141,7 +141,7 @@ fn flight_by_flight(c: &mut Criterion) {
 	group.finish();
 }
 
-/// The record layer — ChaCha20-Poly1305 under the counter-nonce discipline,
+/// The record layer - ChaCha20-Poly1305 under the counter-nonce discipline,
 /// the per-record cost every tunnel byte pays after the handshake.
 fn record_layer(c: &mut Criterion) {
 	let mut group = c.benchmark_group("record");
@@ -162,7 +162,7 @@ fn record_layer(c: &mut Criterion) {
 			b.iter(|| black_box(tx.seal(black_box(&plaintext)).expect("seal")));
 		});
 
-		// Open: a strictly ordered batch per iteration — the receiver's
+		// Open: a strictly ordered batch per iteration - the receiver's
 		// replay window is what forbids a single record being opened twice,
 		// so the measurement opens many records in sequence, fresh counters
 		// each round. Key setup rides along; it is not the point.
@@ -184,7 +184,7 @@ fn record_layer(c: &mut Criterion) {
 	group.finish();
 }
 
-/// Raw BLAKE3, unkeyed, one-shot — the hash the transcript and every key
+/// Raw BLAKE3, unkeyed, one-shot - the hash the transcript and every key
 /// derivation ride on, and the number the vendored build's on-target speed
 /// is measured against.
 fn blake3_raw(c: &mut Criterion) {

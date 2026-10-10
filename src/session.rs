@@ -3,7 +3,7 @@
 //! session with concealed identities, its own record layer, and an optional
 //! anti-DoS cookie.
 //!
-//! The bare handshake provides forward secrecy but no identity binding — an
+//! The bare handshake provides forward secrecy but no identity binding - an
 //! active attacker can relay two bare handshakes and neither side can tell.
 //! This module closes that gap: both flights are signed with the peer's dual
 //! PQC identity keys (ML-DSA-65 + SLH-DSA-SHA2-128f), and confirmation MACs
@@ -12,8 +12,8 @@
 //! secret and (b) their static identity keys.
 //!
 //! Neither identity travels in the clear. Each peer's [`PeerIdentity`] is
-//! sealed — flight 1's to the responder's static concealment key, flight 2's
-//! to a key derived from the shared secret — and the bare handshake's identity
+//! sealed - flight 1's to the responder's static concealment key, flight 2's
+//! to a key derived from the shared secret - and the bare handshake's identity
 //! tags are freshly randomised per session, so no value on the wire repeats
 //! between two sessions of the same peers.
 //!
@@ -47,7 +47,7 @@
 //! H2 covers the responder's identity *ciphertext*, not its plaintext: the
 //! responder signs H2, the initiator decrypts first and then verifies the
 //! signature under the decrypted keys. The initiator signs H3. Each confirm
-//! MAC covers the transcript up to but not including itself — as in TLS 1.3's
+//! MAC covers the transcript up to but not including itself - as in TLS 1.3's
 //! Finished, a MAC cannot cover its own bytes and needs no signature cover
 //! because only the two parties can derive it. The traffic keys derive from
 //! the shared secret and H3, so they inherit every signature and MAC above
@@ -59,7 +59,7 @@
 //! a `.v2` suffix even though this build speaks no v1. That is deliberate: v1
 //! put both identities in cleartext and had no cookie, so its flight shapes are
 //! incompatible with these, and the version field is a *rejection* boundary
-//! rather than a negotiation — a stale v1 peer stops at the version check with
+//! rather than a negotiation - a stale v1 peer stops at the version check with
 //! "unsupported session protocol version 1 (this build speaks 2)" instead of
 //! mis-decoding a struct that no longer has the same fields. Reusing the
 //! number would turn a clean refusal into a confusing parse error. The field
@@ -82,7 +82,7 @@
 //! flight 2 does not open later even if the responder's long-term keys leak.
 //!
 //! `sealed_identity` in flight 1 is sealed to the responder's **static**
-//! concealment key, not to a session secret — the responder has not yet
+//! concealment key, not to a session secret - the responder has not yet
 //! contributed anything. That seal is therefore not forward-secret: a recorded
 //! flight 1 opens once the concealment key leaks, fleet-wide and
 //! retrospectively. Rotate concealment keys per epoch.
@@ -95,15 +95,15 @@
 //! flood of unvalidated flight 1s costs the responder two BLAKE3 hashes each,
 //! not two SLH-DSA signatures. A cookie is only as strong as the carrier's
 //! address integrity: on a carrier that cannot supply a trustworthy peer tag (a
-//! pipe has no address), a peer-supplied tag makes it worthless — fail closed
+//! pipe has no address), a peer-supplied tag makes it worthless - fail closed
 //! there.
 //!
 //! # Soundness of the responder seal
 //!
 //! The responder signs `H2`, which covers `sealed_responder`. That proves a
 //! holder of the signing key endorsed *a blob*; the blob decrypts only for a
-//! session participant. It gives **consistency** — the identity the client
-//! decrypts is the one the signer bound to this session — and **not identity**:
+//! session participant. It gives **consistency** - the identity the client
+//! decrypts is the one the signer bound to this session - and **not identity**:
 //! the client learns the verifying keys *from* the blob, so "the decrypted keys
 //! equal the verifying keys" is a tautology. Identity comes from [`PeerPolicy`]
 //! alone (`Pin`, `Cert`, an out-of-band directory). With `AcceptAny`, a
@@ -112,7 +112,7 @@
 //!
 //! # Not protected
 //!
-//! Replay of a fully captured handshake produces a second valid session —
+//! Replay of a fully captured handshake produces a second valid session -
 //! deduplicate `session_id` server-side if that matters (see
 //! [`crate::replay::SessionReplayGuard`]). Flight 1 is not forward-secret and
 //! its cookie is only as good as the carrier's address. No automatic rekey.
@@ -143,7 +143,7 @@ use crate::session_cookie::SessionCookie;
 /// shapes or the transcript construction.
 ///
 /// `2` because this build's protocol superseded an earlier one whose identities
-/// travelled in the clear. That earlier shape is not compiled here — keeping the
+/// travelled in the clear. That earlier shape is not compiled here - keeping the
 /// number is what keeps the wire format compatible with peers built while it
 /// was.
 pub const PROTOCOL_VERSION: u16 = 2;
@@ -171,7 +171,7 @@ const AAD_RESPONDER_SEAL: &[u8] = DOMAIN_RESPONDER_SEAL.as_bytes();
 /// `version` is the first declared field of every flight-1 type, so postcard
 /// puts it first on the wire and a responder can check it before it commits to
 /// a full decode. `u16` is decoded, not a raw byte: correct today only because
-/// the version is below 128, and the varint does not promise that — a version of
+/// the version is below 128, and the varint does not promise that - a version of
 /// 128 would be two bytes and a raw-byte peek would read the wrong thing.
 ///
 /// Only the prefix is consumed; the caller decodes the whole slice and must
@@ -191,7 +191,7 @@ pub fn peek_version(flight1: &[u8]) -> Result<u16> {
 /// their digest as a human-checkable id, and optionally the certificate that
 /// vouches for them.
 ///
-/// Not `PartialEq` — equality is the policy's job, and a byte-for-byte
+/// Not `PartialEq` - equality is the policy's job, and a byte-for-byte
 /// comparison is not what any policy wants anyway.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PeerIdentity {
@@ -199,7 +199,7 @@ pub struct PeerIdentity {
 	pub mldsa_pk: Vec<u8>,
 	/// SLH-DSA-SHA2-128f public key (32 bytes).
 	pub slhdsa_pk: Vec<u8>,
-	/// `hex(BLAKE3(mldsa_pk || slhdsa_pk))` — matches `TemperKeypair::key_id`.
+	/// `hex(BLAKE3(mldsa_pk || slhdsa_pk))` - matches `TemperKeypair::key_id`.
 	pub key_id: String,
 	/// Certificate vouching for these keys, when the peer presents one.
 	///
@@ -207,7 +207,7 @@ pub struct PeerIdentity {
 	/// plus context), over half a kilobyte by value. Flights and
 	/// [`SessionSecrets`] move `PeerIdentity` around by value; the box keeps
 	/// that a couple of pointers instead of a struct copy. Serialization is
-	/// unaffected — `Box<T>` encodes exactly as `T`.
+	/// unaffected - `Box<T>` encodes exactly as `T`.
 	pub certificate: Option<alloc::boxed::Box<TemperCertificate>>,
 }
 
@@ -246,7 +246,7 @@ pub struct SessionInit {
 	/// by the responder's signature over H2: a MITM that swapped it would
 	/// change H2 and fail the signature check.
 	pub cookie: [u8; 32],
-	/// `envelope::encapsulate(rng, postcard(PeerIdentity_I), K_conceal)` — the
+	/// `envelope::encapsulate(rng, postcard(PeerIdentity_I), K_conceal)` - the
 	/// initiator's identity, readable only by the holder of the responder's
 	/// concealment key.
 	pub sealed_identity: Envelope,
@@ -258,10 +258,10 @@ pub struct SessionInit {
 pub struct SessionAcceptBody {
 	/// The bare key-agreement acceptance.
 	pub acceptance: HandshakeAcceptance,
-	/// `aead_seal(seal_key_R, AAD, postcard(PeerIdentity_R))` — the responder's
+	/// `aead_seal(seal_key_R, AAD, postcard(PeerIdentity_R))` - the responder's
 	/// identity, readable only by a holder of the session secret.
 	pub sealed_responder: Vec<u8>,
-	/// `keyed_hash(K_server, H2)` — only derivable with the shared secret.
+	/// `keyed_hash(K_server, H2)` - only derivable with the shared secret.
 	pub responder_confirm: [u8; 32],
 }
 
@@ -278,7 +278,7 @@ pub struct SessionAccept {
 /// Payload of flight 3: the initiator's proof it derived the shared secret.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionConfirmBody {
-	/// `keyed_hash(K_client, H2)` — only derivable with the shared secret.
+	/// `keyed_hash(K_client, H2)` - only derivable with the shared secret.
 	pub initiator_confirm: [u8; 32],
 }
 
@@ -298,7 +298,7 @@ pub struct SessionConfirm {
 
 /// Which peer identities a session may be established with.
 ///
-/// Every variant still requires the peer's flight signatures to verify —
+/// Every variant still requires the peer's flight signatures to verify -
 /// the policy only decides which identities are *acceptable*, never whether
 /// a flight was authenticated.
 #[derive(Debug, Clone)]
@@ -307,13 +307,13 @@ pub enum PeerPolicy {
 	/// [`PeerIdentity`] is returned in [`SessionSecrets::peer`] for the
 	/// caller to record (trust-on-first-use style).
 	AcceptAny,
-	/// Accept exactly this identity — both keys must match byte for byte.
+	/// Accept exactly this identity - both keys must match byte for byte.
 	Pin(PeerIdentity),
 	/// Accept a peer presenting a certificate that verifies under these CA
 	/// public keys and whose subject keys equal the flight identity.
 	///
 	/// The validity window is checked only if [`CertValidity::At`] names a
-	/// time — no_std has no clock, so this module cannot read one. That
+	/// time - no_std has no clock, so this module cannot read one. That
 	/// choice is a required field rather than a default precisely because a
 	/// silently-skipped window check is a check that passes for the wrong
 	/// reason; the type makes the caller say which it means.
@@ -336,7 +336,7 @@ pub enum PeerPolicy {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CertValidity {
 	/// Enforce `not_before <= now <= not_after` against this Unix time in
-	/// seconds. The caller supplies it — from a system clock, an RTC read, or
+	/// seconds. The caller supplies it - from a system clock, an RTC read, or
 	/// a coarse timestamp the peer's own protocol carried.
 	At(u64),
 	/// This build has no clock, so the window is **not** enforced. A
@@ -437,7 +437,7 @@ pub struct CookieContext<'a> {
 	/// A stable, carrier-supplied tag for the peer. Must be trustworthy: on a
 	/// carrier that cannot vouch for it, the cookie proves nothing.
 	pub peer_tag: &'a [u8; 32],
-	/// The caller's monotonic seconds — same convention as the replay guard.
+	/// The caller's monotonic seconds - same convention as the replay guard.
 	pub now_secs: u64,
 }
 
@@ -445,7 +445,7 @@ pub struct CookieContext<'a> {
 
 // region:    --- Handshake Flights
 
-/// Flight 1 — begin a session as the initiator.
+/// Flight 1 - begin a session as the initiator.
 ///
 /// The bare handshake's `local_id` is a **fresh random** value, not a digest of
 /// the local identity: a deterministic blinding would itself be a stable
@@ -485,13 +485,13 @@ pub fn initiate(
 	))
 }
 
-/// Flight 2 — accept a session as the responder.
+/// Flight 2 - accept a session as the responder.
 ///
 /// Ordering is the anti-DoS contract, and it is enforced here rather than left
 /// to the caller:
 ///
 /// 1. version check,
-/// 2. cookie verification when `cookie` is supplied — before the concealment
+/// 2. cookie verification when `cookie` is supplied - before the concealment
 ///    decapsulation and before any signing, so an unvalidated peer is refused
 ///    for two BLAKE3 hashes,
 /// 3. concealment decapsulation and the decrypted identity's `key_id`
@@ -531,14 +531,14 @@ pub fn accept(
 	let responder = peer_identity(keypair, certificate.cloned());
 
 	// The responder holds the encapsulated secret and its own ephemeral key,
-	// so it derives the secret — and the seal key — immediately.
+	// so it derives the secret - and the seal key - immediately.
 	let secret = handshake::finalize_responder(&init.proposal, &acceptance, &handshake_state);
 	let h1 = transcript_h1(DOMAIN_SESSION, init)?;
 
 	let seal_key = responder_seal_key(&secret, &h1, &acceptance)?;
 	let sealed_responder = aead_seal(&seal_key, AAD_RESPONDER_SEAL, &postcard_bytes(&responder)?)?;
 
-	// H2 covers the ciphertext, not the plaintext identity — a client proves
+	// H2 covers the ciphertext, not the plaintext identity - a client proves
 	// the signature by decrypting first, which only a participant can do.
 	let h2 = transcript_h2(&h1, &acceptance, &sealed_responder)?;
 	let server_key = derive_domain_key(DOMAIN_SERVER_CONFIRM, &secret, &h2);
@@ -565,13 +565,13 @@ pub fn accept(
 	))
 }
 
-/// Flight 3 + key derivation — initiator side.
+/// Flight 3 + key derivation - initiator side.
 ///
 /// Ordering inside this function is load-bearing and must not be reordered:
 /// decrypt the responder's identity, **verify both signatures over H2 under
 /// the decrypted keys**, then the confirm MAC, then the policy. Nothing here
 /// branches on, logs, or `Debug`-prints the plaintext identity before the
-/// signature step — a caller cannot opt out, because there is no point at
+/// signature step - a caller cannot opt out, because there is no point at
 /// which the identity is observable before it has been authenticated.
 pub fn finalize_initiator(
 	rng: &mut TemperEntropy,
@@ -636,7 +636,7 @@ pub fn finalize_initiator(
 	))
 }
 
-/// Key derivation — responder side, after flight 3 arrives.
+/// Key derivation - responder side, after flight 3 arrives.
 ///
 /// Verifies the initiator's confirmation MAC and signatures against the
 /// identity decrypted in [`accept`], and re-applies the policy so a caller
@@ -688,7 +688,7 @@ pub fn finalize_responder(
 /// What a completed handshake leaves both sides agreeing on: the session id,
 /// the authenticated peer identity, and the directional record keys.
 ///
-/// Not `Debug` — the record keys would print.
+/// Not `Debug` - the record keys would print.
 pub struct SessionSecrets {
 	/// Echoed from the initiator's bare proposal.
 	pub session_id: u64,
@@ -714,7 +714,7 @@ pub(crate) fn transcript_h1<T: Serialize>(domain: &str, init: &T) -> Result<blak
 /// `H(H1 || postcard(acceptance) || postcard(tail))`.
 ///
 /// H2 covers the responder flight's payload but *not* its confirm MAC or
-/// signatures — a MAC cannot cover its own bytes, and the signatures are
+/// signatures - a MAC cannot cover its own bytes, and the signatures are
 /// *over* this hash rather than inside it.
 ///
 /// `tail` is the sealed-identity ciphertext, so the hash covers bytes the
@@ -748,7 +748,7 @@ pub(crate) fn derive_key_parts(domain: &str, parts: &[&[u8]]) -> [u8; 32] {
 	*hasher.finalize().as_bytes()
 }
 
-/// `derive_key(domain, secret || transcript)` — the one construction behind
+/// `derive_key(domain, secret || transcript)` - the one construction behind
 /// the confirm keys and both traffic keys, so all four stay domain-separated
 /// by construction.
 pub(crate) fn derive_domain_key(domain: &str, secret: &[u8; 32], transcript: &blake3::Hash) -> [u8; 32] {
@@ -796,7 +796,7 @@ pub(crate) fn peer_identity(keypair: &TemperKeypair, certificate: Option<TemperC
 /// `derive_key("Temper.Session.v2.ResponderSeal", secret || H1 || postcard(acceptance))`.
 ///
 /// The key deliberately covers only what exists **before** the ciphertext it
-/// protects — `secret`, `H1`, and the acceptance — exactly as TLS 1.3 derives
+/// protects - `secret`, `H1`, and the acceptance - exactly as TLS 1.3 derives
 /// EncryptedExtensions keys from the transcript through ServerHello and then
 /// appends the extensions as ciphertext. Including H2 (which contains the
 /// ciphertext) would be circular.

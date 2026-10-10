@@ -116,7 +116,7 @@ pub struct DelegationToken {
 impl DelegationToken {
 	/// Byte length of the MAC preimage: every field before `mac`.
 	///
-	/// `offset_of!` states exactly that — unlike `size_of - 32`, it stays
+	/// `offset_of!` states exactly that - unlike `size_of - 32`, it stays
 	/// correct-by-construction if a field is ever added before `mac` (the
 	/// frozen-layout asserts pin it to 32 anyway).
 	const SIGNED_LEN: usize = core::mem::offset_of!(DelegationToken, mac);
@@ -216,7 +216,7 @@ mod tests {
 	}
 
 	/// Direct byte comparison against the layout spelled out in the struct
-	/// doc — not a sign/verify round-trip, which would pass under any
+	/// doc - not a sign/verify round-trip, which would pass under any
 	/// self-consistent byte order.
 	#[test]
 	fn test_keychain_delegation_token_signed_bytes_matches_layout() {

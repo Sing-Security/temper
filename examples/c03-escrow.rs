@@ -1,22 +1,20 @@
-//! Demonstration of KernelChainEnvelope — dual-KEM encryption for kernel-inspectable IPC.
+//! Demonstration of EscrowEnvelope - escrowed dual-KEM encryption.
 //!
 //! This example shows how to:
-//! 1. Generate keypairs for recipient and kernel
-//! 2. Encapsulate a message with dual-KEM (both recipient and kernel can derive key)
-//! 3. Kernel extracts its shared secret
-//! 4. Recipient decapsulates using kernel-provided secret
+//! 1. Generate keypairs for recipient and escrow holder
+//! 2. Encapsulate a message with dual-KEM (recipient plus escrow holder shares)
+//! 3. Escrow holder extracts its shared secret
+//! 4. Recipient decapsulates using the holder's secret
 //!
-//! Run with: cargo run --example c03-kernel-chain
+//! Run with: cargo run --example c03-escrow
 
 use temper::{
 	TemperEntropy,
-	envelope::{
-		generate_envelope_keypair, kernel_chain_decapsulate, kernel_chain_encapsulate, kernel_chain_extract_secret,
-	},
+	envelope::{escrow_decapsulate, escrow_encapsulate, escrow_extract_secret, generate_envelope_keypair},
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-	println!("=== KernelChainEnvelope Demo ===\n");
+	println!("=== EscrowEnvelope Demo ===\n");
 
 	// Initialize RNG
 	let mut rng = TemperEntropy::from_seed([0x42; 32]);
@@ -24,16 +22,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// 1. Generate keypairs
 	println!("1. Generating keypairs...");
 	let recipient_keypair = generate_envelope_keypair(&mut rng)?;
-	let kernel_keypair = generate_envelope_keypair(&mut rng)?;
+	let escrow_keypair = generate_envelope_keypair(&mut rng)?;
 	println!("   ✓ Recipient keypair: {}", recipient_keypair.key_id);
-	println!("   ✓ Kernel keypair: {}\n", kernel_keypair.key_id);
+	println!("   ✓ Escrow holder keypair: {}\n", escrow_keypair.key_id);
 
 	// 2. Sender creates envelope
 	let plaintext = b"Secret IPC message from process A to process B";
 	println!("2. Sender encapsulates message...");
 	println!("   Plaintext: {:?}", String::from_utf8_lossy(plaintext));
 
-	let envelope = kernel_chain_encapsulate(&mut rng, plaintext, &recipient_keypair, &kernel_keypair)?;
+	let envelope = escrow_encapsulate(&mut rng, plaintext, &recipient_keypair, &escrow_keypair)?;
 
 	println!("   ✓ Envelope created:");
 	println!("     - Envelope ID: {}", envelope.envelope_id);
@@ -41,17 +39,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		"     - ML-KEM recipient CT: {} bytes",
 		envelope.mlkem_ct_recipient.len()
 	);
-	println!("     - ML-KEM kernel CT: {} bytes", envelope.mlkem_ct_kernel.len());
+	println!("     - ML-KEM escrow CT: {} bytes", envelope.mlkem_ct_escrow.len());
 	println!("     - Ciphertext: {} bytes\n", envelope.ciphertext.len());
 
-	// 3. Kernel inspects envelope (extracts its shared secret)
-	println!("3. Kernel extracts shared secret for IPC delivery...");
-	let kernel_shared_secret = kernel_chain_extract_secret(&envelope, &kernel_keypair)?;
-	println!("   ✓ Kernel extracted its ML-KEM shared secret (32 bytes)\n");
+	// 3. Holder inspects envelope (extracts its shared secret)
+	println!("3. Escrow holder extracts shared secret for IPC delivery...");
+	let escrow_shared_secret = escrow_extract_secret(&envelope, &escrow_keypair)?;
+	println!("   ✓ Escrow holder extracted its ML-KEM shared secret (32 bytes)\n");
 
-	// 4. Recipient decapsulates with kernel-provided secret
-	println!("4. Recipient decapsulates using kernel secret...");
-	let recovered_plaintext = kernel_chain_decapsulate(&envelope, &recipient_keypair, &kernel_shared_secret)?;
+	// 4. Recipient decapsulates with holder-provided secret
+	println!("4. Recipient decapsulates using the escrow holder's secret...");
+	let recovered_plaintext = escrow_decapsulate(&envelope, &recipient_keypair, &escrow_shared_secret)?;
 
 	println!("   ✓ Decryption successful!");
 	println!("   Recovered: {:?}\n", String::from_utf8_lossy(&recovered_plaintext));
@@ -62,7 +60,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	// Performance note
 	println!("\n=== Performance Note ===");
-	println!("KernelChainEnvelope cost: ~0.3 ms per message");
+	println!("EscrowEnvelope cost: ~0.3 ms per message");
 	println!("  - 2× ML-KEM-1024 Encap (~0.1 ms each)");
 	println!("  - 1× X25519 DH (~0.05 ms)");
 	println!("  - ChaCha20-Poly1305 encrypt (GB/s throughput)");

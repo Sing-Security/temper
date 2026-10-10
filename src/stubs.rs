@@ -63,7 +63,7 @@ pub fn verify_seal(_content: &[u8], _seal: &Seal, _mldsa_pk: &[u8], _slhdsa_pk: 
 pub struct Envelope;
 
 #[cfg(not(feature = "envelope"))]
-pub struct KernelChainEnvelope;
+pub struct EscrowEnvelope;
 
 #[cfg(not(feature = "envelope"))]
 #[derive(Debug, Clone)]
@@ -108,28 +108,25 @@ pub fn authenticated_decapsulate(_envelope: &[u8], _secret_key: &EnvelopeKeypair
 }
 
 #[cfg(all(not(feature = "envelope"), feature = "alloc"))]
-pub fn kernel_chain_encapsulate(
+pub fn escrow_encapsulate(
 	_rng: &mut TemperEntropy,
 	_plaintext: &[u8],
 	_recipient_keypair: &EnvelopeKeypair,
-	_kernel_keypair: &EnvelopeKeypair,
-) -> Result<KernelChainEnvelope> {
-	Ok(KernelChainEnvelope)
+	_escrow_keypair: &EnvelopeKeypair,
+) -> Result<EscrowEnvelope> {
+	Ok(EscrowEnvelope)
 }
 
 #[cfg(all(not(feature = "envelope"), feature = "alloc"))]
-pub fn kernel_chain_decapsulate(
-	_envelope: &KernelChainEnvelope,
+pub fn escrow_decapsulate(
+	_envelope: &EscrowEnvelope,
 	_recipient_keypair: &EnvelopeKeypair,
-	_kernel_shared_secret: &[u8; 32],
+	_escrow_shared_secret: &[u8; 32],
 ) -> Result<alloc::vec::Vec<u8>> {
 	Ok(alloc::vec::Vec::new())
 }
 
 #[cfg(all(not(feature = "envelope"), feature = "alloc"))]
-pub fn kernel_chain_extract_secret(
-	_envelope: &KernelChainEnvelope,
-	_kernel_keypair: &EnvelopeKeypair,
-) -> Result<[u8; 32]> {
+pub fn escrow_extract_secret(_envelope: &EscrowEnvelope, _escrow_keypair: &EnvelopeKeypair) -> Result<[u8; 32]> {
 	Ok([0u8; 32])
 }

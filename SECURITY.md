@@ -14,7 +14,7 @@ as we work on a fix.
 ## Scope
 
 Temper implements a protocol on top of audited RustCrypto primitives. The most
-useful reports are about the code here — the entropy pool and DRBG, the seal
+useful reports are about the code here - the entropy pool and DRBG, the seal
 binding, the envelope construction, the handshake's key derivation, the session
 protocol's transcript chain and key schedule, the record layer's nonce and AAD
 construction, and any path where a secret could leak, a check could be skipped,
@@ -30,7 +30,7 @@ These limitations are deliberate and documented, not vulnerabilities:
 
 - **`handshake` is unauthenticated key agreement.** It provides forward secrecy
   but no protection against an active man-in-the-middle on its own. The
-  authenticated wrapper is the `session` protocol — dual transcript signatures
+  authenticated wrapper is the `session` protocol - dual transcript signatures
   on both sides, mandatory client authentication. Its residual risks (handshake
   replay, cleartext identities, no rekey, caller-side certificate-expiry checks)
   are listed in [`PROTOCOL.md`](PROTOCOL.md); read that list before deploying it.

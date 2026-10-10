@@ -16,7 +16,7 @@ CI runs the same list; see `.github/workflows/ci.yml`.
 
 ## Formatting
 
-The tree is indented with hard tabs and `max_width = 120`. Run `cargo fmt` — the
+The tree is indented with hard tabs and `max_width = 120`. Run `cargo fmt` - the
 settings are in `rustfmt.toml` and match the upstream project this crate is
 developed in, so a plain `cargo fmt --check` should pass with no config.
 
@@ -25,7 +25,7 @@ developed in, so a plain `cargo fmt --check` should pass with no config.
 These need more than a passing test suite:
 
 - **Do not change a serialized type.** `Seal`, `SealContext`, `Envelope`,
-  `KernelChainEnvelope`, `HandshakeProposal` and `HandshakeAcceptance` cross
+  `EscrowEnvelope`, `HandshakeProposal` and `HandshakeAcceptance` cross
   process, wire, and on-disk boundaries with existing deployments. Field names,
   field order, and encodings are frozen. `DelegationToken` is a `repr(C)` binary
   ABI. Adding a field is a breaking change even when it compiles.

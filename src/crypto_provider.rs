@@ -25,7 +25,7 @@
 //!
 //! `get_crypto_provider` is gated on `signatures`, and this module is not, so
 //! the example is compile-checked only when that feature is on. The module
-//! compiles without it — that is the point of the gate — but the trait and
+//! compiles without it - that is the point of the gate - but the trait and
 //! the accessor are not there to call.
 
 #[cfg(all(feature = "alloc", feature = "signatures"))]

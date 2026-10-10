@@ -36,13 +36,13 @@ both sides derive C2S/S2C record keys
 Client authentication is mandatory: the responder refuses to derive a session
 until flight 3 verifies. All messages are postcard-encoded structs; the
 framing that carries them (length prefix, stream) belongs to the carrier. The
-`transport` feature ships one such carrier — `[u32 little-endian length]
+`transport` feature ships one such carrier - `[u32 little-endian length]
 [payload]` frames over TCP, the flights as plaintext frames, then one record
 per frame for the life of the session.
 
-Neither identity travels in the clear. Each peer's `PeerIdentity` is sealed —
+Neither identity travels in the clear. Each peer's `PeerIdentity` is sealed -
 flight 1's to the responder's static concealment key, flight 2's to a key
-derived from the shared secret — and the bare handshake's identity tags are
+derived from the shared secret - and the bare handshake's identity tags are
 freshly randomised per session, so no value on the wire repeats between two
 sessions of the same peers.
 
@@ -118,14 +118,14 @@ Details that matter:
   keys in the signer's own `PeerIdentity`.
 - H2 covers the accept flight's payload but **not** its confirm MAC or its
   signatures. A MAC cannot cover its own bytes (as in TLS 1.3 Finished), and
-  the signatures are *over* H2 rather than inside it — they need no cover
+  the signatures are *over* H2 rather than inside it - they need no cover
   from themselves. Tampering with either is caught by the MAC check or the
   signature check respectively.
 - H2 covers the responder's identity **ciphertext**, not its plaintext: the
   `|| sealed_responder` above is the postcard encoding of a `Vec<u8>`. The
   responder signs H2; the initiator decrypts first and only then verifies the
   signature under the decrypted keys. The signature proves a holder of the
-  responder's key endorsed a blob — and that blob decrypts only for a session
+  responder's key endorsed a blob - and that blob decrypts only for a session
   participant.
 - The initiator's identity is covered once, inside SessionInit (H1). H3
   binds the initiator's confirm flight to that identity through the chain.
@@ -150,7 +150,7 @@ receives on S2C; the responder mirrors. Confirm MAC comparisons are
 constant-time.
 
 Every domain string is distinct, so no value derived for one purpose can be
-mistaken for another's — a confirm MAC cannot serve as a record key, and one
+mistaken for another's - a confirm MAC cannot serve as a record key, and one
 direction's keys cannot stand in for the other's.
 
 ## Record layer
@@ -189,14 +189,14 @@ generation(seq) = seq / REKEY_INTERVAL
   signal and cannot be desynchronized by configuration: both ends move at the
   same record or not at all.
 - The chain is one-way. An attacker who obtains one generation's key gets
-  neither the records before it nor the records after it — which is the whole
+  neither the records before it nor the records after it - which is the whole
   point, and is why this is a ratchet rather than a periodic re-derivation
   from `secret`, which would leave the entire session readable to anyone who
   later obtained that secret.
 - Datagram mode: a record names its own generation. A receiver keeps the
   previous generation's key so a record that arrives just after a boundary
   still opens, refuses anything older, and refuses to walk more than 4
-  generations forward — the walk is driven by a sequence number that arrives
+  generations forward - the walk is driven by a sequence number that arrives
   from the network, and an unbounded walk is unbounded work per packet.
 - Sealing at a sequence from a retired generation is refused: the key is
   gone and the nonce may already have been used, which breaks ChaCha20
@@ -210,8 +210,8 @@ bytes; `open_padded` reverses it.
 
 - This **quantizes** lengths, it does not hide them: an observer still sees
   how many blocks a record took, and still sees the timing, direction and
-  count of every record. It removes the fine signal — the exact size of a
-  request — at a cost of at most `block` bytes per record.
+  count of every record. It removes the fine signal - the exact size of a
+  request - at a cost of at most `block` bytes per record.
 - There is no negotiation, so both ends must choose it. A receiver that
   calls plain `open` on a padded record gets the framing back rather than a
   decryption failure, and the layer above sees a malformed payload.
@@ -219,13 +219,13 @@ bytes; `open_padded` reverses it.
 ## Identity and policy
 
 `PeerPolicy` decides which `PeerIdentity` may hold the other end. Every
-variant still requires the flight signatures to verify — the policy only
+variant still requires the flight signatures to verify - the policy only
 chooses *whose* identities are acceptable:
 
-- `AcceptAny` — any verified identity; the authenticated identity is
+- `AcceptAny` - any verified identity; the authenticated identity is
   returned in `SessionSecrets::peer` (trust-on-first-use style).
-- `Pin(identity)` — both public keys must match byte for byte.
-- `Cert { ca_mldsa_pk, ca_slhdsa_pk, validity }` — the flight must carry a
+- `Pin(identity)` - both public keys must match byte for byte.
+- `Cert { ca_mldsa_pk, ca_slhdsa_pk, validity }` - the flight must carry a
   certificate that verifies under the CA keys, and the certificate's subject
   signing keys must equal the flight identity's keys.
 
@@ -234,8 +234,8 @@ subject id, the validity window, the subject's ML-DSA-65 and SLH-DSA public
 keys, and its **concealment public key**. Certifying the concealment key is
 what makes a first contact authenticated end to end: it is the key the
 initiator KEM-encapsulates flight 1 to, and if it is not the certified one an
-impostor who supplies its own key opens the sealed identity — exactly what
-concealment exists to prevent — without ever completing the handshake. The
+impostor who supplies its own key opens the sealed identity - exactly what
+concealment exists to prevent - without ever completing the handshake. The
 signing-key equality check above covers what flight 1 presents; the
 concealment binding covers what flight 1 is sealed *to*. A schema-1
 certificate does not verify under this build.
@@ -244,14 +244,14 @@ The validity window is governed by `validity`:
 
 - `CertValidity::At(now_secs)` enforces `not_before <= now <= not_after`
   against a caller-supplied Unix time. The check runs *after* the seal
-  verifies — before that, `not_after` is an attacker-controlled field.
+  verifies - before that, `not_after` is an attacker-controlled field.
 - `CertValidity::NotChecked` is for a build with no clock and skips the
   window entirely: an expired or not-yet-valid certificate is accepted as
   long as its seal chains to the trusted CA.
 
 This is a required field and not a default, deliberately. A silently skipped
 expiry check is a check that passes for the wrong reason, and nothing else in
-the handshake notices a certificate that expired — the seal verifies
+the handshake notices a certificate that expired - the seal verifies
 perfectly. `not_before` matters for the same reason in the other direction:
 a certificate issued for a future window can be presented early, and only the
 window check catches it.
@@ -259,7 +259,7 @@ window check catches it.
 ## Concealment
 
 The initiator's identity is KEM-encapsulated to the responder's **concealment
-public key** — a long-term key published before the session starts, and
+public key** - a long-term key published before the session starts, and
 certified (see *Identity and policy*): an uncertified concealment key is an
 impostor's key, because the encapsulation opens to whoever holds its secret.
 The responder's identity is sealed under a key derived from the session
@@ -276,7 +276,7 @@ sealed_responder = ChaCha20-Poly1305(seal_key_R, nonce = 0,
 Details that matter:
 
 - `seal_key_R` covers exactly what exists **before** the ciphertext it
-  protects: `secret`, `H1`, and the acceptance — the TLS 1.3
+  protects: `secret`, `H1`, and the acceptance - the TLS 1.3
   EncryptedExtensions pattern. Folding H2 in would be circular, because H2
   contains this ciphertext.
 - The all-zero nonce is safe only because the key is provably used once: it is
@@ -286,7 +286,7 @@ Details that matter:
 - H2 covers the **ciphertext**, not the plaintext identity:
   `H2 = H(H1 || postcard(acceptance) || sealed_responder)`. The `||` is the
   postcard encoding of a `Vec<u8>`. So the signature proves a holder of the
-  responder's key endorsed a blob — and that blob decrypts only for a
+  responder's key endorsed a blob - and that blob decrypts only for a
   participant.
 
 ### Forward secrecy of the seals
@@ -296,7 +296,7 @@ shared `secret`, which only the two parties can compute, so a recorded flight 2
 does not open later even if the responder's long-term keys leak.
 
 `sealed_identity` in flight 1 is sealed to the responder's **static**
-concealment key, not to a session secret — the responder has not yet
+concealment key, not to a session secret - the responder has not yet
 contributed anything. That seal is therefore not forward-secret: a recorded
 flight 1 opens once the concealment key leaks, fleet-wide and
 retrospectively. Rotate concealment keys per epoch.
@@ -309,7 +309,7 @@ detail.
 Responder, in `accept`:
 
 1. version check;
-2. cookie verification, when one is configured — **before** the concealment
+2. cookie verification, when one is configured - **before** the concealment
    decapsulation and before any signing;
 3. concealment decapsulation, and a consistency check that the decrypted
    identity's `key_id` equals `hex(BLAKE3(mldsa_pk || slhdsa_pk))`;
@@ -318,7 +318,7 @@ Responder, in `accept`:
 
 Initiator, in `finalize_initiator`: decrypt the responder's identity,
 verify **both** signatures over H2 under the decrypted keys, check the confirm
-MAC, then apply the policy — and never branch on, log, or `Debug`-print the
+MAC, then apply the policy - and never branch on, log, or `Debug`-print the
 plaintext identity before the signature step. A caller cannot opt out, because
 there is no point at which the identity is observable before it has been
 authenticated.
@@ -336,7 +336,7 @@ previous** bucket, so a client that received a cookie just before a rollover
 is not refused just after one; the cost is that a cookie lives up to
 `2 * ttl_secs`.
 
-`peer_tag` binds the cookie to the peer as the carrier sees it — over TCP,
+`peer_tag` binds the cookie to the peer as the carrier sees it - over TCP,
 `BLAKE3("Temper.Transport.PeerTag" || ip_family || ip || port_le)`. A cookie
 is worth exactly as much as that tag's integrity. On a carrier where the peer
 can choose its own tag (anything spoofable) the attacker simply presents its
@@ -344,7 +344,7 @@ own, so **a responder configured with a cookie but no trustworthy tag fails
 closed** rather than issuing a value anyone can mint.
 
 A responder that requires a cookie and receives flight 1 without a valid one
-answers with a `SessionChallenge` and stops — one hash and 33 bytes, in place
+answers with a `SessionChallenge` and stops - one hash and 33 bytes, in place
 of the decapsulation and two SLH-DSA signatures flight 2 costs. The client
 discards the first, unauthenticated flight entirely and starts a fresh one
 carrying the cookie (fresh ephemerals and a fresh blinded id, because the
@@ -399,12 +399,12 @@ protocol error, never a fallback.
 that shape carried both identities in cleartext and had no cookie field, so its
 flight bytes are incompatible with these. This build speaks only 2, and the
 number, together with the `.v2` in the domain strings, is what makes the
-incompatibility surface as a clear rejection rather than a mis-decode — a peer
+incompatibility surface as a clear rejection rather than a mis-decode - a peer
 still speaking 1 stops at the version check with "unsupported session protocol
 version 1 (this build speaks 2)". The version field itself exists so a future
 breaking change can be negotiated rather than guessed at.
 
-The wire types are frozen on publish — any change to field order, types, or
+The wire types are frozen on publish - any change to field order, types, or
 the transcript/key-schedule recipes is a version bump, not an edit. The types
 are pinned by goldens in `frozen_tests.rs`.
 
@@ -414,18 +414,18 @@ Protected:
 
 - **Confidentiality and integrity** of every record, and of the handshake's
   key agreement (hybrid ML-KEM-1024 + X25519, forward secret).
-- **Mutual authentication** — both flights carry dual PQC signatures over a
+- **Mutual authentication** - both flights carry dual PQC signatures over a
   transcript that chains the full handshake; an active relay of two
   independent handshakes fails signature and MAC verification.
 - **Concealment of both identities** from a non-participant passive observer,
   with no value on the wire repeating between two sessions of the same peers.
-- **Record replay/reorder** (stream mode) — rejected by construction.
+- **Record replay/reorder** (stream mode) - rejected by construction.
 - **Key-compromise impersonation is limited to the stolen key's side**;
   forward secrecy keeps past sessions safe if a static key leaks later.
 - **Forward secrecy within a session**, via the rekey ratchet: a key
   recovered from memory at record *n* does not decrypt the records before it
   or after it.
-- **Transcript replay** — a captured flight 1/2/3 sequence cannot be
+- **Transcript replay** - a captured flight 1/2/3 sequence cannot be
   replayed to completion. Both sides contribute fresh ephemerals that are
   bound into the transcript hash, so a replayed flight 1 makes the responder
   derive a different secret and a replayed flight 3 fails its confirm MAC.
@@ -453,16 +453,16 @@ Not protected (caller's responsibility, or out of scope):
   signatures, the most expensive operation in the protocol). A replay guard
   refuses repeats of a known id but cannot help with fresh ones. The optional
   cookie closes this when the carrier supplies a trustworthy peer tag; without
-  one the mitigations are outside the protocol — rate-limit at the carrier, or
+  one the mitigations are outside the protocol - rate-limit at the carrier, or
   require a cheaper pre-flight.
-- **Traffic analysis** — lengths, timing, direction and record counts are
+- **Traffic analysis** - lengths, timing, direction and record counts are
   visible regardless of padding. Padding quantizes lengths at block
   granularity only; shaping, cover traffic, or a mixing carrier are not in
   this layer.
 - **Confidentiality against a later compromise of the responder's concealment
-  key** — flight 1's seal is not forward-secret, as above.
-- **Certificate validity windows** — enforced only when the caller supplies
+  key** - flight 1's seal is not forward-secret, as above.
+- **Certificate validity windows** - enforced only when the caller supplies
   `CertValidity::At(now)`; see above.
-- **Denial of service against an established session** — an attacker who can
+- **Denial of service against an established session** - an attacker who can
   drop packets can stall a stream, since stream mode has no gap tolerance.
   A datagram carrier with its own window is the answer, not this layer.

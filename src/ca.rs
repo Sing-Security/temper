@@ -1,7 +1,7 @@
 //! Certificate Authority (CA) for issuing and verifying quantum-safe certificates.
 //!
 //! Provides a [`TemperCa`] that can issue [`TemperCertificate`]s binding a subject
-//! identity to its quantum-safe public keys — both the signing keys and the
+//! identity to its quantum-safe public keys - both the signing keys and the
 //! concealment key (see [`ConcealmentBinding`] for why the latter is certified).
 //! The certificate is backed by a dual post-quantum Seal (ML-DSA-65 + SLH-DSA)
 //! created by the CA's [`TemperKeypair`].
@@ -59,7 +59,7 @@ use crate::seal::{Seal, TemperKeypair, create_seal, generate_keypair, verify_sea
 // Schema 2 adds the subject's concealment public key to the signed content.
 // The bump is deliberately a hard break: a schema-1 certificate does not
 // verify under this code (the domain string differs too), because a v1 cert
-// cannot answer the one question first contact actually has — is the
+// cannot answer the one question first contact actually has - is the
 // concealment key I am about to seal my identity to the peer's? Silently
 // accepting one would turn "certified" into "certified, minus the part that
 // matters". No schema-1 certificate was ever issued outside tests.
@@ -75,8 +75,8 @@ const CA_CERT_DOMAIN: &str = "Temper.CA.Cert.v2";
 /// A certificate that signs only the subject's signing keys still leaves the
 /// first flight unauthenticated. The initiator seals its identity to the
 /// responder's concealment key, taken from whatever identity document it
-/// holds; an impostor who substitutes a key it controls opens that flight —
-/// learning exactly the identity the seal exists to hide — without ever
+/// holds; an impostor who substitutes a key it controls opens that flight -
+/// learning exactly the identity the seal exists to hide - without ever
 /// completing the handshake, because nothing but the responder's word said
 /// which concealment key was the right one. Signing the concealment key into
 /// the certificate removes the last input a first contact takes on faith.
@@ -107,7 +107,7 @@ impl ConcealmentBinding {
 		}
 	}
 
-	/// Rebuild the published form — the key an initiator encapsulates to.
+	/// Rebuild the published form - the key an initiator encapsulates to.
 	pub fn to_public_key(&self) -> crate::envelope::ConcealmentPublicKey {
 		crate::envelope::ConcealmentPublicKey::from_parts(
 			self.schema_version,
@@ -188,13 +188,13 @@ pub struct TemperCertificate {
 	/// Schema version for forward compatibility.
 	pub schema_version: u16,
 
-	/// Unique certificate identifier — BLAKE3(postcard(cert content)) as hex.
+	/// Unique certificate identifier - BLAKE3(postcard(cert content)) as hex.
 	pub cert_id: String,
 
 	/// Subject identity (who this certificate is for).
 	pub subject_id: String,
 
-	/// Issuer identity — the CA's `signer_id`.
+	/// Issuer identity - the CA's `signer_id`.
 	pub issuer_id: String,
 
 	/// Certificate validity start (Unix seconds; 0 = immediately valid).
@@ -265,7 +265,7 @@ impl TemperCertificate {
 		Ok(())
 	}
 
-	/// The certificate's subject keys as one value — the form
+	/// The certificate's subject keys as one value - the form
 	/// [`build_cert_content`] signs, and what a verifier compares a
 	/// presented identity against.
 	pub fn subject_keys(&self) -> SubjectKeys {

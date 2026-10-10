@@ -6,14 +6,14 @@
 
 /// Custom getrandom for CrucibleOS *userspace* builds (no_std CBLs).
 ///
-/// Fills the buffer from the kernel CSPRNG via the `GetRandom` (80) syscall —
+/// Fills the buffer from the kernel CSPRNG via the `GetRandom` (80) syscall -
 /// the same source `std`'s PAL uses. Without this, no_std CBLs fell through
 /// to the zero-fill stub below, which made `TemperEntropy::new()` (the
-/// alloc-only constructor) seed its DRBG deterministically — every temper-cbl
+/// alloc-only constructor) seed its DRBG deterministically - every temper-cbl
 /// service keypair was derived from an all-zero seed.
 ///
 /// Gated behind an explicit feature (NOT `target_os = "crucible"`) because the
-/// kernel itself also links this crate with the same `target_os` — executing a
+/// kernel itself also links this crate with the same `target_os` - executing a
 /// ring-3 `syscall`/`svc` instruction in ring 0 / EL1 must be impossible by
 /// construction, so only userspace crates may enable `crucible-user-getrandom`.
 #[cfg(all(not(feature = "std"), feature = "crucible-user-getrandom"))]
@@ -65,7 +65,7 @@ fn custom_getrandom(buf: &mut [u8]) -> core::result::Result<(), getrandom::Error
 			ret = -1;
 		}
 		if ret <= 0 {
-			// Honest failure — never fabricate entropy here.
+			// Honest failure - never fabricate entropy here.
 			return Err(err());
 		}
 		let n = (ret as usize).min(remaining.len());

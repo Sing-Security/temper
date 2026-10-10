@@ -9,8 +9,8 @@
 //! ephemeral keys: the responder signs `H2`, which contains the initiator's
 //! ML-KEM encapsulation key *and* the responder's own new ephemeral, and the
 //! secret is agreed against those. Replaying a recorded `init` makes the
-//! responder derive a *different* secret, so a recorded `confirm` — whose
-//! MAC was taken over the old transcript — cannot complete it, and the
+//! responder derive a *different* secret, so a recorded `confirm` - whose
+//! MAC was taken over the old transcript - cannot complete it, and the
 //! responder's own recorded `accept` cannot be replayed at a client whose
 //! `H1` differs. Neither side has to do anything for that to hold.
 //!
@@ -18,15 +18,15 @@
 //! twice, and that has two real consequences:
 //!
 //! - **A caller that indexes session state by id loses the live entry.**
-//!   This is the ordinary shape — a server keeps `session_id -> keys` — and
+//!   This is the ordinary shape - a server keeps `session_id -> keys` - and
 //!   a replayed flight 1 arrives with a genuine, correctly-signed identity
 //!   and the same id, so the table is simply overwritten. The victim's next
 //!   record then fails to open. The attacker cannot read anything, but it
 //!   can destroy a session it cannot break, silently, for the cost of
 //!   replaying one captured packet. The guard turns that into a refusal.
 //! - **Every accepted flight 1 costs the responder two SLH-DSA signatures.**
-//!   Flight 2 is the most expensive message in the protocol — roughly 17 KiB
-//!   of signature per SLH-DSA-SHA2-128f signing, twice — and it is produced
+//!   Flight 2 is the most expensive message in the protocol - roughly 17 KiB
+//!   of signature per SLH-DSA-SHA2-128f signing, twice - and it is produced
 //!   before the initiator has proved anything. Refusing a *known* id costs a
 //!   set lookup. This is a mitigation, not a defence: an attacker sending
 //!   fresh ids still gets a flight 2 for each one, and the answer to that is
@@ -154,7 +154,7 @@ impl SessionReplayGuard {
 
 	/// Whether this id would be refused right now, without admitting it.
 	///
-	/// Does not prune — a read that mutates is a surprise, and the answer
+	/// Does not prune - a read that mutates is a surprise, and the answer
 	/// for an expired entry is the same either way (it is not a replay).
 	pub fn is_replay(&self, session_id: u64) -> bool {
 		self.seen.contains(&session_id)
@@ -283,7 +283,7 @@ mod tests {
 	fn test_replay_guard_eviction_does_not_leave_a_stale_membership() -> Result<()> {
 		// The set and the ordering deque are two structures kept in step by
 		// hand. If eviction removed from one and not the other, the guard
-		// would refuse ids it no longer remembers — a self-inflicted denial
+		// would refuse ids it no longer remembers - a self-inflicted denial
 		// of service that only shows up after exactly `capacity` admissions.
 		let mut guard = SessionReplayGuard::new(60, 2)?;
 		guard.admit(1, 0)?;

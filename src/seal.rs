@@ -7,24 +7,24 @@
 //!
 //! # Implementation Status
 //!
-//! ✅ **Complete and tested** — All PQC primitives integrated with RustCrypto libraries:
+//! ✅ **Complete and tested** - All PQC primitives integrated with RustCrypto libraries:
 //! - ML-DSA-65 (v0.1.0-rc.7): Lattice-based, NIST Category 3, Module-LWE hardness
 //! - SLH-DSA-SHA2-128f (v0.2.0-rc.4): Hash-based, NIST Category 1, stateless signatures, fast variant
 //! - DEFLATE compression: Optional size reduction for network transmission and embedded storage
 //!
 //! # Protocol
 //!
-//! 1. `content_hash = BLAKE3(message)` — 256-bit content-addressed hash
+//! 1. `content_hash = BLAKE3(message)` - 256-bit content-addressed hash
 //! 2. `context = SealContext { domain, timestamp, signer_id, metadata }`
-//! 3. `binding = hex(content_hash) || postcard(context)` — deterministic binding
-//! 4. `σ₁ = ML-DSA-65.Sign(sk₁, binding)` — lattice-based signature (3309 bytes, stored as raw bytes)
-//! 5. `σ₂ = SLH-DSA-SHA2-128f.Sign(sk₂, binding)` — hash-based signature (17088 bytes, stored as raw bytes)
+//! 3. `binding = hex(content_hash) || postcard(context)` - deterministic binding
+//! 4. `σ₁ = ML-DSA-65.Sign(sk₁, binding)` - lattice-based signature (3309 bytes, stored as raw bytes)
+//! 5. `σ₂ = SLH-DSA-SHA2-128f.Sign(sk₂, binding)` - hash-based signature (17088 bytes, stored as raw bytes)
 //!
 //! # Compression
 //!
 //! Seals can be optionally compressed using DEFLATE (level 9) to reduce transmission and storage size:
-//! - `seal.to_compressed_bytes()` — Serialize and compress seal
-//! - `Seal::from_compressed_bytes(data)` — Decompress and deserialize seal
+//! - `seal.to_compressed_bytes()` - Serialize and compress seal
+//! - `Seal::from_compressed_bytes(data)` - Decompress and deserialize seal
 //! - Typical total seal size: ~20.7KB uncompressed
 //! - Compression effectiveness varies with signature entropy
 //! - Integrated into authenticated envelope protocol automatically
@@ -32,9 +32,9 @@
 //! # Verification
 //!
 //! ALL three checks must pass for valid seal:
-//! - `BLAKE3(content) == seal.content_hash` — content integrity
-//! - `ML-DSA.Verify(pk₁, binding, σ₁)` — primary signature (quantum-safe lattice)
-//! - `SLH-DSA.Verify(pk₂, binding, σ₂)` — backup signature (quantum-safe hash)
+//! - `BLAKE3(content) == seal.content_hash` - content integrity
+//! - `ML-DSA.Verify(pk₁, binding, σ₁)` - primary signature (quantum-safe lattice)
+//! - `SLH-DSA.Verify(pk₂, binding, σ₂)` - backup signature (quantum-safe hash)
 //!
 //! # Security Properties
 //!

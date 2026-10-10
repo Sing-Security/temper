@@ -14,9 +14,9 @@ Framing, syscalls, and the network are outside the measurement.
 
 ## The session handshake (2026-10)
 
-A full establishment — ML-KEM-1024+X25519 hybrid exchange, identity
+A full establishment - ML-KEM-1024+X25519 hybrid exchange, identity
 concealment, and four ML-DSA-65 plus SLH-DSA-SHA2-128f signatures and
-verifications across the two sides — costs **~77 ms** of combined CPU,
+verifications across the two sides - costs **~77 ms** of combined CPU,
 about **13 sessions/s per core**.
 
 | flight | work | time |
@@ -47,11 +47,11 @@ ChaCha20-Poly1305 under the counter-nonce discipline, single core:
 
 ~0.85 GiB/s per core is the tunnel ceiling; it is the expected ChaCha class
 for portable Rust (no hardware AEAD), well below AES-NI TLS but with no
-instruction-set requirement — the same code runs on an ARM crucible.
+instruction-set requirement - the same code runs on an ARM crucible.
 
 ## BLAKE3 (vendored, 2026-10)
 
 The vendored build reaches **~3.6 GiB/s** single-core (64 KiB and 1 MiB
 inputs alike), which is the published AVX2/AVX512 tier for blake3 on
-desktop-class x86 — roughly 4× the record layer, so transcript hashing
+desktop-class x86 - roughly 4× the record layer, so transcript hashing
 disappears inside the AEAD cost.

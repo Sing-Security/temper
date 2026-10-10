@@ -11,7 +11,7 @@ use alloc::string::ToString;
 type Result<T> = core::result::Result<T, Box<dyn core::error::Error>>; // For tests.
 
 /// A deterministic concealment binding. Built from literal bytes rather than a
-/// generated envelope keypair so these tests compile — and run — under
+/// generated envelope keypair so these tests compile - and run - under
 /// `signatures` alone, without the `envelope` feature.
 fn concealment_fixture(seed: u8) -> ConcealmentBinding {
 	ConcealmentBinding {
@@ -160,7 +160,7 @@ fn test_ca_verify_tampered_concealment_fails() -> Result<()> {
 	// This is the field the certificate exists to protect at first contact:
 	// an initiator seals its identity to the concealment key it reads out of
 	// the certificate, so an unauthenticated concealment key is an impostor's
-	// key. Each half is flipped in turn — the ML-KEM and X25519 keys are
+	// key. Each half is flipped in turn - the ML-KEM and X25519 keys are
 	// separate inputs to the signed content, so one passing would not
 	// exercise the other.
 
@@ -313,7 +313,7 @@ fn test_ca_cert_id_is_deterministic() -> Result<()> {
 	let keys = keys_fixture(&subject_kp, 0xD9);
 
 	// -- Exec
-	// The cert_id is BLAKE3(postcard(cert_content)) — deterministic from fields alone.
+	// The cert_id is BLAKE3(postcard(cert_content)) - deterministic from fields alone.
 	let cert1 = ca.issue_certificate(&mut rng, "judy@example.com", &keys, 0, 0)?;
 	let cert2 = ca.issue_certificate(&mut rng, "judy@example.com", &keys, 0, 0)?;
 
@@ -330,7 +330,7 @@ fn test_ca_cert_id_is_deterministic() -> Result<()> {
 fn test_ca_cert_id_covers_the_concealment_key() -> Result<()> {
 	// Property: cert_id commits to the concealment key, not just the signing
 	// keys. Two subjects with everything else identical but different
-	// concealment keys must get different ids — an id that ignored the
+	// concealment keys must get different ids - an id that ignored the
 	// concealment binding would let two certificates for the same signing
 	// key be confused for one another by anything keyed on cert_id.
 
@@ -354,7 +354,7 @@ fn test_ca_cert_id_covers_the_concealment_key() -> Result<()> {
 #[test]
 fn test_ca_concealment_binding_roundtrips_to_public_key() -> Result<()> {
 	// Property: a binding taken from a published concealment key rebuilds
-	// that exact key after a certificate round trip — including the derived
+	// that exact key after a certificate round trip - including the derived
 	// key_id, which is not stored in the certificate and must be recomputed
 	// to the same value.
 

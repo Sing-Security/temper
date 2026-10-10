@@ -1,4 +1,4 @@
-//! # Network transport — the session protocol over length-prefixed frames
+//! # Network transport - the session protocol over length-prefixed frames
 //!
 //! Framing:
 //!
@@ -6,7 +6,7 @@
 //! [ u32 little-endian length | postcard payload ]
 //! ```
 //!
-//! implemented over tokio's `LengthDelimitedCodec` — the codec writes and
+//! implemented over tokio's `LengthDelimitedCodec` - the codec writes and
 //! parses the 4-byte little-endian length field.
 //!
 //! # Protocol
@@ -14,11 +14,11 @@
 //! 1. [`connect`] dials TCP and runs the initiator half of the session
 //!    protocol; [`Listener::accept`] answers with the responder half. The
 //!    three flights ([`SessionInit`], [`SessionAccept`], [`SessionConfirm`])
-//!    travel as ordinary frames — the identities inside them sealed, and every
+//!    travel as ordinary frames - the identities inside them sealed, and every
 //!    flight bound by the transcript signatures and confirm MACs (see
 //!    [`crate::session`] and `PROTOCOL.md`).
 //! 2. Every [`Session::send`] / [`Session::recv`] afterwards is one AEAD
-//!    record per frame, sealed under the direction's record key — there is
+//!    record per frame, sealed under the direction's record key - there is
 //!    no plaintext mode once the session exists.
 //!
 //! A responder that requires an anti-DoS cookie interposes a flight 0
@@ -29,7 +29,7 @@
 //! # Security boundary
 //!
 //! After the handshake: confidentiality and integrity (ChaCha20-Poly1305,
-//! counter nonces — replay and reorder rejected), mutual authentication
+//! counter nonces - replay and reorder rejected), mutual authentication
 //! (dual PQC transcript signatures, [`PeerPolicy`]), forward secrecy, and
 //! concealment of both identities from a passive observer.
 //!
@@ -121,7 +121,7 @@ where
 /// encrypted frame.
 ///
 /// Generic over the byte stream so the session can run over anything
-/// `AsyncRead + AsyncWrite` — TCP via [`connect`] and [`Listener`], or any
+/// `AsyncRead + AsyncWrite` - TCP via [`connect`] and [`Listener`], or any
 /// stream a consumer supplies directly (a duplex pipe, a TLS wrapper).
 ///
 /// Deliberately not `Debug`: the derived output would print key material.
@@ -141,7 +141,7 @@ where
 	/// `rng` is caller-supplied (a seeded source makes the whole handshake
 	/// reproducible in tests); `policy` decides which responder identities are
 	/// acceptable. `responder_concealment` is the responder's published
-	/// concealment key — the one piece of long-term material a client must know
+	/// concealment key - the one piece of long-term material a client must know
 	/// before it can hide anything, fetched out of band (a pinned config, a
 	/// directory, a certificate).
 	///
@@ -209,8 +209,8 @@ where
 
 	/// Run the three flights as the responder over an accepted stream.
 	///
-	/// `replay` is consulted as soon as flight 1 is decoded — before flight 2
-	/// is computed, which is the expensive half — so a replayed handshake is
+	/// `replay` is consulted as soon as flight 1 is decoded - before flight 2
+	/// is computed, which is the expensive half - so a replayed handshake is
 	/// refused without the two SLH-DSA signatures it would otherwise cost.
 	/// `config.now_secs` only has to be monotonic and in seconds; a counter
 	/// since process start is as good as a wall clock, and this crate has no
@@ -345,8 +345,8 @@ where
 	/// Split into the sending and receiving halves, to drive them from two
 	/// tasks.
 	///
-	/// The relay shape — read from one stream, write to another, in both
-	/// directions at once — cannot use [`Session::send`] and [`Session::recv`],
+	/// The relay shape - read from one stream, write to another, in both
+	/// directions at once - cannot use [`Session::send`] and [`Session::recv`],
 	/// because each needs `&mut self` and a `select!` over both borrows the
 	/// session twice. The record layer was already split-ready
 	/// ([`RecordKeys::into_keys`]); this exposes the same split for the
@@ -471,7 +471,7 @@ pub struct ResponderConfig<'a> {
 	/// check is ceremony. [`peer_tag_from_addr`] derives one from a connected
 	/// socket address.
 	pub peer_tag: Option<[u8; 32]>,
-	/// The caller's monotonic seconds — the same convention as the replay
+	/// The caller's monotonic seconds - the same convention as the replay
 	/// guard, and the same clock that drives cookie rotation.
 	pub now_secs: u64,
 }
@@ -480,7 +480,7 @@ pub struct ResponderConfig<'a> {
 ///
 /// Binds to IP **and** port. A TCP connection's peer address cannot change
 /// under it, so a cookie issued during the handshake remains valid for that
-/// handshake — and a value captured from someone else's connection does not
+/// handshake - and a value captured from someone else's connection does not
 /// verify, because redeeming it would require holding that address.
 ///
 /// The security of this rests entirely on the source address being
@@ -531,7 +531,7 @@ fn decode_accept_reply(frame: &[u8]) -> Result<AcceptReply> {
 /// Dial `addr` and complete the three flights as the initiator, concealing both
 /// identities from a passive observer.
 ///
-/// `responder_concealment` is the responder's published concealment key — the
+/// `responder_concealment` is the responder's published concealment key - the
 /// one piece of long-term material a client must know before it can hide
 /// anything, fetched out of band (a pinned config, a directory, a certificate).
 pub async fn connect(
@@ -585,7 +585,7 @@ impl Listener {
 		})
 	}
 
-	/// The bound address — how a caller learns the port when binding port 0.
+	/// The bound address - how a caller learns the port when binding port 0.
 	pub fn local_addr(&self) -> Result<std::net::SocketAddr> {
 		Ok(self.inner.local_addr()?)
 	}
@@ -653,7 +653,7 @@ mod tests {
 		raw.read_exact(&mut header).await?;
 		assert_eq!(u32::from_le_bytes(header) as usize, payload.len());
 		// Negative control: the payload is short, so its LE and BE encodings
-		// differ — a codec flipped to the tokio default (big-endian) would
+		// differ - a codec flipped to the tokio default (big-endian) would
 		// fail the assertion above, and cannot pass this one.
 		assert_ne!(header, (payload.len() as u32).to_be_bytes());
 		let mut body = alloc::vec![0u8; payload.len()];
@@ -758,7 +758,7 @@ mod tests {
 		let (io_i, io_r) = duplex(256 * 1024);
 		let mut raw = Framed::new(io_i, frame_codec());
 		raw.send(flight_one.clone()).await?;
-		drop(raw); // the peer vanishes after flight 1 — no flight 3 will come
+		drop(raw); // the peer vanishes after flight 1 - no flight 3 will come
 		let first = Session::accept(io_r, &mut s_rng, &config, &mut guard).await;
 
 		let (io_i2, io_r2) = duplex(256 * 1024);
@@ -838,7 +838,7 @@ mod tests {
 		// Enabling premise, asserted rather than assumed: the placeholder a
 		// client sends when nobody has asked it for a cookie never verifies.
 		// So a handshake that completes against this config can only have done
-		// so by receiving the challenge and resending — the challenge path is
+		// so by receiving the challenge and resending - the challenge path is
 		// not merely present, it ran.
 		assert!(!cookie.verify(&[0u8; 32], &peer_tag, 1000));
 
@@ -873,7 +873,7 @@ mod tests {
 
 	#[tokio::test]
 	async fn test_transport_listener_over_tcp_derives_the_peer_tag() -> TestResult<()> {
-		// -- Setup & Fixtures: `peer_tag` deliberately left unset — the
+		// -- Setup & Fixtures: `peer_tag` deliberately left unset - the
 		// listener is the party that can see where the peer really is.
 		let mut listener = Listener::bind("127.0.0.1:0").await?;
 		let addr = listener.local_addr()?;
@@ -925,7 +925,7 @@ mod tests {
 		let at_client: TestMessage = c_rx.recv().await?.ok_or("client saw EOF")?;
 
 		// -- Check: the split halves run the same record counters the whole
-		// session would have — one send on each side, in each direction.
+		// session would have - one send on each side, in each direction.
 		assert_eq!(at_server, fixture_message(1, "from the tx half"));
 		assert_eq!(at_client, fixture_message(2, "and back"));
 		Ok(())
@@ -950,7 +950,7 @@ mod tests {
 	// region:    --- Support
 
 	/// One full session over a fresh duplex. `ephemeral_seed` drives BOTH
-	/// sides' handshake entropy — callers pass distinct values to prove that
+	/// sides' handshake entropy - callers pass distinct values to prove that
 	/// distinct handshakes derive distinct traffic keys.
 	async fn establish(
 		ephemeral_seed: u8,
@@ -1003,7 +1003,7 @@ mod tests {
 		}
 	}
 
-	/// Seeded rngs and keypairs — every handshake in this suite is
+	/// Seeded rngs and keypairs - every handshake in this suite is
 	/// reproducible byte-for-byte.
 	fn fixtures() -> (TemperEntropy, TemperEntropy, TemperKeypair, TemperKeypair) {
 		let mut c_rng = TemperEntropy::from_seed([0xC1; 32]);

@@ -167,7 +167,7 @@ impl TemperEntropy {
 	/// On targets with OS support (Linux, macOS, Windows), `getrandom` uses the
 	/// native OS entropy source (`/dev/urandom`, `getrandom()` syscall, etc.).
 	/// On bare-metal targets without OS entropy, this falls back to the registered
-	/// custom handler (zero-fill stub — callers should prefer `from_sources` there).
+	/// custom handler (zero-fill stub - callers should prefer `from_sources` there).
 	///
 	/// This constructor allows code that uses `alloc` but not `std` (e.g. userspace
 	/// crucibles compiled with `default-features = false, features = ["alloc", …]`)

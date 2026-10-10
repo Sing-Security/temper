@@ -1,23 +1,23 @@
-# Temper — Quantum-Safe Cryptographic Protocol
+# Temper - Quantum-Safe Cryptographic Protocol
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-2024-orange.svg)](https://www.rust-lang.org)
 [![no_std](https://img.shields.io/badge/no__std-compatible-green.svg)](https://docs.rust-embedded.org/book/intro/no-std.html)
 
 **Temper** is a Rust cryptographic protocol library for quantum-safe, embedded, and
-server environments. It is `#![no_std]` throughout — `alloc` is required, `std` is
-optional — and every primitive is chosen for post-quantum resistance.
+server environments. It is `#![no_std]` throughout - `alloc` is required, `std` is
+optional - and every primitive is chosen for post-quantum resistance.
 
 ## Overview
 
-- **Hardened entropy** — a multi-source pool (OS, hardware, jitter, process) is mixed
+- **Hardened entropy** - a multi-source pool (OS, hardware, jitter, process) is mixed
   through BLAKE3 into a ChaCha20 DRBG that reseeds automatically.
-- **Dual PQC signatures** — a seal is valid only if both an ML-DSA-65 and an
+- **Dual PQC signatures** - a seal is valid only if both an ML-DSA-65 and an
   SLH-DSA-SHA2-128f signature verify. The two rest on unrelated hardness assumptions,
   so breaking one is not enough.
-- **Hybrid key encapsulation** — ML-KEM-1024 combined with X25519, so an envelope stays
+- **Hybrid key encapsulation** - ML-KEM-1024 combined with X25519, so an envelope stays
   confidential unless *both* are broken.
-- **Deterministic identifiers** — content and structural IDs are BLAKE3-derived, not
+- **Deterministic identifiers** - content and structural IDs are BLAKE3-derived, not
   random, so structures are reproducible from their inputs.
 
 ## Modules
@@ -45,9 +45,9 @@ optional — and every primitive is chosen for post-quantum resistance.
 | ML-DSA-65 | FIPS 204 | Category 3 | sig 3309 B, pk 1952 B |
 | SLH-DSA-SHA2-128f | FIPS 205 | Category 1 | sig 17088 B, pk 32 B |
 | ML-KEM-1024 | FIPS 203 | Category 5 | ct 1568 B |
-| X25519 | RFC 7748 | — | 32 B |
-| ChaCha20-Poly1305 | RFC 8439 | — | AEAD |
-| BLAKE3 | — | — | 256-bit digest |
+| X25519 | RFC 7748 | - | 32 B |
+| ChaCha20-Poly1305 | RFC 8439 | - | AEAD |
+| BLAKE3 | - | - | 256-bit digest |
 
 The SLH-DSA category follows the parameter *number*, not the variant: 128 is
 Category 1, 192 is Category 3, 256 is Category 5. Temper uses the fast (`f`) variant,
@@ -82,7 +82,7 @@ Both must verify for a seal to be valid
 ## Usage
 
 The crate publishes as **`temper-rs`** (the `temper` name on crates.io is
-taken); the library it provides — and everything in these examples — is
+taken); the library it provides - and everything in these examples - is
 `temper`:
 
 ```toml
@@ -112,14 +112,14 @@ assert!(result.is_valid());
 
 ## Feature Flags
 
-- **`alloc`** — heap support (Vec, String, BTreeMap). Required by everything.
-- **`std`** *(default)* — standard library, OS entropy sources, convenience APIs.
-- **`envelope`** *(default)* — ML-KEM-1024 + X25519 hybrid KEM. Implies `signatures`.
-- **`session`** — the authenticated session protocol: three postcard flights over any carrier,
+- **`alloc`** - heap support (Vec, String, BTreeMap). Required by everything.
+- **`std`** *(default)* - standard library, OS entropy sources, convenience APIs.
+- **`envelope`** *(default)* - ML-KEM-1024 + X25519 hybrid KEM. Implies `signatures`.
+- **`session`** - the authenticated session protocol: three postcard flights over any carrier,
   dual PQC transcript signatures, confirm MACs, and directional record keys with a rekey
-  ratchet and opt-in length padding. Both identities are concealed — the initiator's is
+  ratchet and opt-in length padding. Both identities are concealed - the initiator's is
   sealed to the responder's long-term concealment key, the responder's under a key derived
-  from the session secret — and the handshake ids are blinded with fresh randomness rather
+  from the session secret - and the handshake ids are blinded with fresh randomness rather
   than a deterministic identity digest. A responder can add an optional stateless cookie so
   it refuses an unvalidated peer for the price of two BLAKE3 hashes instead of a flight 2,
   and a `SessionReplayGuard` to refuse a repeated `session_id`. Client authentication is
@@ -130,23 +130,23 @@ assert!(result.is_valid());
   not forward-secret. Read
   [*What the protocol does not do*](PROTOCOL.md#what-the-protocol-does-not-do) before
   relying on it.
-- **`transport`** *(std only)* — framed messages (`[u32 LE length][postcard payload]`) over
+- **`transport`** *(std only)* - framed messages (`[u32 LE length][postcard payload]`) over
   tokio, with a TCP client/server that runs the three session flights and then moves one
   encrypted record per frame. `connect` and `Listener::accept` run the handshake; the
   responder's identity, certificate, policy, and optional cookie live in a `ResponderConfig`.
   Implies `std` and `session`; there is no plaintext mode.
-- **`signatures`** — ML-DSA-65 and SLH-DSA seal construction and verification.
-- **`keychain`** — derived-key hierarchy. Requires only BLAKE3.
-- **`compression`** — DEFLATE for seals and envelopes. Implied by `std`.
-- **`hardware_example`** — hardware TRNG integration template. Works with or without `std`.
-- **`blake3_simd`** *(std only)* — BLAKE3 SIMD intrinsics (NEON, SSE2, AVX2, AVX-512).
-- **`blake3_parallel`** *(std only)* — Rayon-based parallel hashing for content ≥ 1 MiB.
+- **`signatures`** - ML-DSA-65 and SLH-DSA seal construction and verification.
+- **`keychain`** - derived-key hierarchy. Requires only BLAKE3.
+- **`compression`** - DEFLATE for seals and envelopes. Implied by `std`.
+- **`hardware_example`** - hardware TRNG integration template. Works with or without `std`.
+- **`blake3_simd`** *(std only)* - BLAKE3 SIMD intrinsics (NEON, SSE2, AVX2, AVX-512).
+- **`blake3_parallel`** *(std only)* - Rayon-based parallel hashing for content ≥ 1 MiB.
   Implies `blake3_simd`.
-- **`crucible-user-getrandom`** — host-platform entropy hook. See below.
+- **`crucible-user-getrandom`** - host-platform entropy hook. See below.
 
 With `signatures` disabled, the seal API compiles to stubs so that downstream code
 still builds: `verify_seal` returns `Ok(valid: true)` unconditionally. **Do not rely
-on seal verification without the `signatures` feature** — the feature is on by default
+on seal verification without the `signatures` feature** - the feature is on by default
 and is implied by `envelope`.
 
 ## Platform Integration
@@ -159,7 +159,7 @@ zero-fill fallback used on bare metal. Without it, a `no_std` build that calls
 predictable keys. Enable it on any `no_std` target that has an OS underneath it.
 
 **`keychain`** provides a derived-key hierarchy seeded from a process root key. Its
-BLAKE3 domain strings are fixed cryptographic separators — changing them would change
+BLAKE3 domain strings are fixed cryptographic separators - changing them would change
 every derived key, so treat them as a wire format.
 
 ## Testing
@@ -174,14 +174,14 @@ cargo fmt --all --check
 
 The entropy test suite checks statistical properties: byte distribution (chi-squared,
 255 df at p=0.001), bit balance, autocorrelation (|r| < 0.019), avalanche/SAC, and
-collision-freedom over 1M u64 samples. These are probabilistic — a rare failure is not
+collision-freedom over 1M u64 samples. These are probabilistic - a rare failure is not
 automatically a bug, and loosening a bound to make a run go green is not a fix.
 
 ## Build Profiles
 
-- **`release`** — size-first (`opt-level = "s"`, fat LTO, `panic = "abort"`, stripped).
+- **`release`** - size-first (`opt-level = "s"`, fat LTO, `panic = "abort"`, stripped).
   For embedded targets with limited flash.
-- **`release-server`** — speed-first (`opt-level = 3`, thin LTO, unwinding enabled).
+- **`release-server`** - speed-first (`opt-level = 3`, thin LTO, unwinding enabled).
   Roughly 15–25% faster than `release`.
 
 ```sh
@@ -213,9 +213,9 @@ options.
 
 ## Security
 
-Report vulnerabilities privately — see [`SECURITY.md`](SECURITY.md). Three properties are
+Report vulnerabilities privately - see [`SECURITY.md`](SECURITY.md). Three properties are
 deliberate and documented rather than bugs: `handshake` is unauthenticated key agreement
-(its authenticated wrapper is the `session` protocol — see [`PROTOCOL.md`](PROTOCOL.md) for
+(its authenticated wrapper is the `session` protocol - see [`PROTOCOL.md`](PROTOCOL.md) for
 what that does and does not protect against), handshake flights travel in cleartext inside
 the carrier, and the host-integration features above are not general-purpose API.
 
@@ -227,4 +227,4 @@ string.
 
 ## License
 
-Apache-2.0 — see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
+Apache-2.0 - see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).

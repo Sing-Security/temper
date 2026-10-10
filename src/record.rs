@@ -4,7 +4,7 @@
 //! The sequence number never travels on the wire: it is the nonce suffix and
 //! part of the AAD, so a replayed, reordered, or skipped record fails its tag
 //! with no extra receiver state. For a reliable stream, use [`RecordKey::seal`]
-//! / [`RecordKey::open`] — strict +1 ordering, both counters start at 0. For a
+//! / [`RecordKey::open`] - strict +1 ordering, both counters start at 0. For a
 //! datagram carrier (packet-oriented transports with their own loss/reorder
 //! policy), [`RecordKey::seal_at`] / [`RecordKey::open_at`] take the sequence
 //! explicitly and leave the acceptance window to the caller.
@@ -24,7 +24,7 @@
 //!
 //! Every [`REKEY_INTERVAL`] records both ends ratchet the key forward:
 //! `key(n+1) = derive_key("Temper.Session.v2.Rekey", key(n))`. The ratchet is
-//! a plain hash chain, so it is one-way in both directions — an attacker who
+//! a plain hash chain, so it is one-way in both directions - an attacker who
 //! reads one generation's key out of memory gets neither the records before
 //! it nor the records after it. That is the point, and it is the reason this
 //! is a ratchet rather than a periodic re-derivation from the handshake
@@ -43,7 +43,7 @@
 //! previous generation's key so a packet that arrives just after a boundary
 //! still opens, and refuses anything further back than that.
 //!
-//! Padding is optional and off unless asked for — see
+//! Padding is optional and off unless asked for - see
 //! [`RecordKey::seal_padded`].
 
 #![cfg(feature = "session")]
@@ -65,7 +65,7 @@ use crate::error::{Error, Result};
 /// 2²⁰ records is ~100 seconds at 10k records/s and ~17 minutes at 1k/s:
 /// frequent enough that a long-lived tunnel is not sitting on one key for
 /// hours, rare enough that the ratchet itself is never measurable. The value
-/// is a protocol constant — see the module docs for why it is not a knob.
+/// is a protocol constant - see the module docs for why it is not a knob.
 pub const REKEY_INTERVAL: u64 = 1 << 20;
 
 /// Context string for one ratchet step. Versioned with the protocol: if the
@@ -98,7 +98,7 @@ const PAD_LEN_PREFIX: usize = 4;
 /// `seal` counts up `next_tx` (what this side emits); `open` counts up
 /// `next_rx` (what this side expects next). They advance independently
 /// because they model the two ends of the key: an endpoint that both seals
-/// and opens under one key — a relay, or the symmetric single-key setup —
+/// and opens under one key - a relay, or the symmetric single-key setup -
 /// must not let sends advance its receive expectation or vice versa. The
 /// session protocol hands out different keys per direction anyway, in which
 /// case each side simply only ever touches one of the two counters.
@@ -171,7 +171,7 @@ impl RecordKey {
 	}
 
 	/// Decrypt the next record in strict order. The receive counter advances
-	/// by one. Any replay, reorder, or skip fails the tag — the sequence is
+	/// by one. Any replay, reorder, or skip fails the tag - the sequence is
 	/// inside the nonce and the AAD, so the wrong record never
 	/// authenticates.
 	pub fn open(&mut self, record: &[u8]) -> Result<Vec<u8>> {
@@ -183,7 +183,7 @@ impl RecordKey {
 	}
 
 	/// Encrypt at an explicit sequence (datagram path). Does not touch the
-	/// counters. Reusing a sequence under one key is the caller's bug — and
+	/// counters. Reusing a sequence under one key is the caller's bug - and
 	/// a catastrophic one; see the module docs.
 	///
 	/// Refuses a sequence from an *earlier* generation than the key is on:
@@ -218,9 +218,9 @@ impl RecordKey {
 	///
 	/// This quantizes record lengths, it does not hide them: an observer
 	/// still sees how many blocks a record took, and still sees the timing
-	/// and the direction of every record. It removes the *fine* signal — the
+	/// and the direction of every record. It removes the *fine* signal - the
 	/// exact size of a request, which for something like a login or a file
-	/// fetch is most of the information a passive observer needs — at the
+	/// fetch is most of the information a passive observer needs - at the
 	/// cost of at most `block` extra bytes per record. Real traffic-analysis
 	/// resistance needs shaping, cover traffic, or a carrier that mixes
 	/// peers, none of which is in this layer.
@@ -294,7 +294,7 @@ impl RecordKey {
 	}
 
 	/// Ratchet forward until `key` covers generation `generation`. Refuses to move
-	/// backwards — the chain is one-way — and refuses an unbounded jump.
+	/// backwards - the chain is one-way - and refuses an unbounded jump.
 	fn advance_to(&mut self, generation: u64) -> Result<()> {
 		if generation < self.generation {
 			return Err(Error::Protocol(alloc::format!(
@@ -582,7 +582,7 @@ mod tests {
 		// -- Check
 		assert_eq!(ping, b"ping");
 		assert_eq!(pong, b"pong");
-		// Negative control: a direction cross would fail the tag — that is
+		// Negative control: a direction cross would fail the tag - that is
 		// the whole point of two keys instead of one.
 		assert!(init.send().open(&s2c).is_err());
 		Ok(())
@@ -640,7 +640,7 @@ mod tests {
 	#[test]
 	fn test_record_ratchet_determinism_across_boundaries() -> Result<()> {
 		// Two independent keys ratchet to the same place, so a record sealed
-		// on one opens on the other — the property the whole scheme rests on.
+		// on one opens on the other - the property the whole scheme rests on.
 		let mut a = RecordKey::new(K1);
 		let mut b = RecordKey::new(K1);
 
@@ -725,7 +725,7 @@ mod tests {
 	fn test_record_ratchet_stream_path_crosses_the_boundary() -> Result<()> {
 		// The stream counters have to cross the same boundary the explicit
 		// path does. Reaching 2^20 by sealing is minutes of work, so the
-		// counter is fast-forwarded here instead — `next_rx` is the only
+		// counter is fast-forwarded here instead - `next_rx` is the only
 		// thing `open` reads to decide the generation.
 		let mut sender = RecordKey::new(K1);
 		let mut receiver = RecordKey::new(K1);
@@ -801,7 +801,7 @@ mod tests {
 	fn test_record_padding_is_not_transparent_to_the_unpadded_open() -> Result<()> {
 		// Documented consequence, pinned: a receiver that calls `open` on a
 		// padded record gets the framing back rather than an error. The layer
-		// above sees a malformed payload — which is the point of writing it
+		// above sees a malformed payload - which is the point of writing it
 		// down, because "it fails somewhere else" is easy to mistake for "it
 		// cannot happen".
 		let mut sender = RecordKey::new(K1);

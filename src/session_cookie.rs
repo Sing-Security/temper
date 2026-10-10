@@ -1,7 +1,7 @@
 //! A stateless anti-DoS cookie for the session handshake.
 //!
-//! Flight 2 is the most expensive message in the protocol — two SLH-DSA
-//! signatures, roughly 17 KiB of signature per signing — and a responder
+//! Flight 2 is the most expensive message in the protocol - two SLH-DSA
+//! signatures, roughly 17 KiB of signature per signing - and a responder
 //! produces it before the initiator has proved anything. A
 //! [`SessionReplayGuard`](crate::replay::SessionReplayGuard) refuses a *known*
 //! session id cheaply, but an attacker sending fresh ids still buys a flight 2
@@ -16,7 +16,7 @@
 //! time_bucket = now_secs / ttl_secs
 //! ```
 //!
-//! The responder needs only `server_secret` to verify — no table, no memory
+//! The responder needs only `server_secret` to verify - no table, no memory
 //! proportional to the number of clients. `peer_tag` binds the cookie to the
 //! peer (typically its address bytes) so a value issued to one client cannot
 //! be replayed by another; `time_bucket` rotates it so a captured cookie stops
@@ -30,7 +30,7 @@
 //! # Why it lives here, not in `session`
 //!
 //! [`crate::session`] is a pure state machine with no I/O and no notion of
-//! addresses — which is exactly what lets it run on any carrier. A cookie
+//! addresses - which is exactly what lets it run on any carrier. A cookie
 //! needs the peer's identity *as the carrier sees it* and a clock, neither of
 //! which belongs in that module. This is the same reason
 //! [`crate::replay`](crate::replay) is separate: the caller owns the address
@@ -39,8 +39,8 @@
 //! # What it is not
 //!
 //! A cookie is only as strong as the `peer_tag`'s integrity. On a carrier that
-//! cannot supply a trustworthy tag — a pipe has no address, and a header a
-//! peer can spoof is no better — the check is worthless, because the attacker
+//! cannot supply a trustworthy tag - a pipe has no address, and a header a
+//! peer can spoof is no better - the check is worthless, because the attacker
 //! simply presents its own tag. Do not enable cookies on such a carrier; fail
 //! closed rather than pretending.
 //!
@@ -76,7 +76,7 @@ impl SessionCookie {
 	/// `server_secret` must be a stable, secret, per-responder value; rotating
 	/// it invalidates every outstanding cookie. `ttl_secs` is clamped to at
 	/// least one second, because a zero period cannot define a bucket and
-	/// would divide by zero — a cookie with no rotation is not a cookie.
+	/// would divide by zero - a cookie with no rotation is not a cookie.
 	pub fn new(server_secret: [u8; 32], ttl_secs: u64) -> Self {
 		Self {
 			server_secret,
@@ -165,7 +165,7 @@ mod tests {
 		let state = cookie();
 		let value = state.issue(&[0x01; 32], 500);
 
-		// -- Check: a value issued to one tag does not verify for another —
+		// -- Check: a value issued to one tag does not verify for another -
 		// which is what stops one client redeeming another's cookie.
 		assert!(!state.verify(&value, &[0x02; 32], 500));
 		Ok(())

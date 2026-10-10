@@ -1,14 +1,14 @@
 //! Freeze tests for the serialization types that cross process, wire, and
 //! on-disk boundaries: `Seal`, `SealContext`, `Envelope`,
-//! `KernelChainEnvelope`, `HandshakeProposal`, `HandshakeAcceptance`, and —
-//! under `session` — the protocol's wire types (CONTRIBUTING.md "Crypto
+//! `EscrowEnvelope`, `HandshakeProposal`, `HandshakeAcceptance`, and -
+//! under `session` - the protocol's wire types (CONTRIBUTING.md "Crypto
 //! changes").
 //!
 //! Two independent directions:
 //!
-//! - Golden byte vectors — the exact postcard encoding as it ships today.
+//! - Golden byte vectors - the exact postcard encoding as it ships today.
 //!   Any field/order/encoding change fails here first.
-//! - Proptest round-trips for every type — arbitrary values must survive
+//! - Proptest round-trips for every type - arbitrary values must survive
 //!   serialize -> deserialize unchanged, which catches lossy decoders the
 //!   golden vector cannot see.
 
@@ -19,6 +19,7 @@ use crate::seal::{Seal, SealContext, SignatureBlock};
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
+#[cfg(feature = "session")]
 use alloc::vec;
 use alloc::vec::Vec;
 use proptest::prelude::*;
@@ -27,7 +28,7 @@ use proptest::test_runner::TestCaseError;
 #[cfg(feature = "session")]
 use crate::ca::{ConcealmentBinding, TemperCertificate};
 #[cfg(feature = "envelope")]
-use crate::envelope::{Envelope, KernelChainEnvelope};
+use crate::envelope::{Envelope, EscrowEnvelope};
 #[cfg(feature = "envelope")]
 use crate::handshake::{HandshakeAcceptance, HandshakeProposal};
 #[cfg(feature = "session")]
@@ -86,10 +87,10 @@ proptest! {
 
 	#[cfg(feature = "envelope")]
 	#[test]
-	fn test_frozen_kernel_chain_envelope_postcard_roundtrip(envelope in arb_kernel_chain_envelope()) {
+	fn test_frozen_escrow_envelope_postcard_roundtrip(envelope in arb_escrow_envelope()) {
 		// -- Exec
 		let bytes = postcard_bytes(&envelope)?;
-		let back: KernelChainEnvelope = postcard_back(&bytes)?;
+		let back: EscrowEnvelope = postcard_back(&bytes)?;
 
 		// -- Check
 		prop_assert_eq!(back, envelope);
@@ -203,7 +204,7 @@ fn test_frozen_session_challenge_postcard_golden() -> Result<()> {
 	// -- Exec
 	let bytes = postcard::to_allocvec(&challenge).map_err(|e| Error::Serialization(e.to_string()))?;
 
-	// -- Check: version varint then the 32-byte cookie — the whole flight 0.
+	// -- Check: version varint then the 32-byte cookie - the whole flight 0.
 	assert_eq!(hex::encode(&bytes), GOLDEN_SESSION_CHALLENGE_POSTCARD_HEX);
 	Ok(())
 }
@@ -217,7 +218,7 @@ fn test_frozen_session_init_postcard_golden() -> Result<()> {
 	// -- Exec
 	let bytes = postcard::to_allocvec(&init).map_err(|e| Error::Serialization(e.to_string()))?;
 
-	// -- Check: one vector pins the nested shape — version, HandshakeProposal,
+	// -- Check: one vector pins the nested shape - version, HandshakeProposal,
 	// cookie, and the sealed Envelope. `version` is first, which is what makes
 	// it peekable.
 	assert_eq!(hex::encode(&bytes), GOLDEN_SESSION_INIT_POSTCARD_HEX);
@@ -347,7 +348,7 @@ fn arb_envelope() -> impl Strategy<Value = Envelope> {
 }
 
 #[cfg(feature = "envelope")]
-fn arb_kernel_chain_envelope() -> impl Strategy<Value = KernelChainEnvelope> {
+fn arb_escrow_envelope() -> impl Strategy<Value = EscrowEnvelope> {
 	(
 		any::<u16>(),
 		arb_bytes(),
@@ -361,16 +362,16 @@ fn arb_kernel_chain_envelope() -> impl Strategy<Value = KernelChainEnvelope> {
 			|(
 				schema_version,
 				mlkem_ct_recipient,
-				mlkem_ct_kernel,
+				mlkem_ct_escrow,
 				x25519_ephemeral_pk,
 				ciphertext,
 				nonce,
 				envelope_id,
 			)| {
-				KernelChainEnvelope {
+				EscrowEnvelope {
 					schema_version,
 					mlkem_ct_recipient,
-					mlkem_ct_kernel,
+					mlkem_ct_escrow,
 					x25519_ephemeral_pk,
 					ciphertext,
 					nonce,

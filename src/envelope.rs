@@ -1,4 +1,4 @@
-//! # Temper Envelope — Hybrid Key Encapsulation Module
+//! # Temper Envelope - Hybrid Key Encapsulation Module
 //!
 //! **Production-ready implementation** with hybrid post-quantum key encapsulation.
 //!
@@ -20,15 +20,15 @@
 //! 3. Return `EnvelopeKeypair { mlkem_sk, mlkem_pk, x25519_sk, x25519_pk }`
 //!
 //! ## Encapsulation
-//! 1. `(mlkem_ct, mlkem_ss) = ML-KEM.Encap(mlkem_pk)` — PQ shared secret
-//! 2. `x25519_ss = X25519.DH(x25519_pk, ephemeral_sk)` — Classical shared secret
+//! 1. `(mlkem_ct, mlkem_ss) = ML-KEM.Encap(mlkem_pk)` - PQ shared secret
+//! 2. `x25519_ss = X25519.DH(x25519_pk, ephemeral_sk)` - Classical shared secret
 //! 3. `combined_key = BLAKE3.derive_key("Temper.Envelope.v1", mlkem_ss || x25519_ss)`
 //! 4. `ciphertext = ChaCha20-Poly1305.Encrypt(combined_key, plaintext)`
 //! 5. Return `Envelope { mlkem_ct, x25519_ephemeral_pk, ciphertext, tag }`
 //!
 //! ## Decapsulation
-//! 1. `mlkem_ss = ML-KEM.Decap(mlkem_sk, mlkem_ct)` — PQ shared secret
-//! 2. `x25519_ss = X25519.DH(x25519_ephemeral_pk, x25519_sk)` — Classical shared secret
+//! 1. `mlkem_ss = ML-KEM.Decap(mlkem_sk, mlkem_ct)` - PQ shared secret
+//! 2. `x25519_ss = X25519.DH(x25519_ephemeral_pk, x25519_sk)` - Classical shared secret
 //! 3. `combined_key = BLAKE3.derive_key("Temper.Envelope.v1", mlkem_ss || x25519_ss)`
 //! 4. `plaintext = ChaCha20-Poly1305.Decrypt(combined_key, ciphertext, tag)`
 //! 5. Return `plaintext` or error if authentication fails
@@ -111,11 +111,11 @@ const X25519_SS_SIZE: usize = 32;
 /// Combined shared secret size (64 bytes).
 const COMBINED_SS_SIZE: usize = MLKEM_SS_SIZE + X25519_SS_SIZE;
 
-/// Domain separation string for kernel chain key derivation.
-const DOMAIN_KERNEL_CHAIN: &str = "Temper.KernelChain.v1";
+/// Domain separation string for escrow key derivation.
+const DOMAIN_ESCROW: &str = "Temper.Escrow.v1";
 
-/// Combined shared secret size for kernel chain (96 bytes = 32 + 32 + 32).
-const KERNEL_CHAIN_COMBINED_SS_SIZE: usize = MLKEM_SS_SIZE + MLKEM_SS_SIZE + X25519_SS_SIZE;
+/// Combined shared secret size for escrow (96 bytes = 32 + 32 + 32).
+const ESCROW_COMBINED_SS_SIZE: usize = MLKEM_SS_SIZE + MLKEM_SS_SIZE + X25519_SS_SIZE;
 
 // endregion: --- Constants
 
@@ -195,45 +195,63 @@ pub struct Envelope {
 	pub envelope_id: String,
 }
 
-/// Kernel-chain envelope — dual-KEM for kernel-inspectable encryption.
+/// Escrowed envelope - hybrid PQ encryption with a designated third party
+/// in the key agreement.
 ///
-/// NO seals involved. Authentication comes from the kernel setting
-/// `sender: ProcessId` (unforgeable) and capability validation.
-/// Confidentiality comes from hybrid PQ encryption with kernel escrow.
+/// Three parties, three shares: the recipient and the escrow holder each
+/// get an ML-KEM ciphertext, and the recipient contributes a classical
+/// X25519 share on top. No single share derives the channel key - the
+/// escrow holder's share must be delivered alongside the ciphertext for
+/// anyone to decrypt.
+///
+/// The motivating deployment is an OS kernel mediating message passing
+/// (CrucibleOS): the kernel extracts its share per message and hands it to
+/// the recipient at delivery, so admission control and per-message
+/// attestation stay possible without the kernel holding a master key. The
+/// same shape fits any transport where a third party is already in the
+/// message path - a mail proxy, a broker, a break-glass auditor - and must
+/// stay there cryptographically rather than by policy.
+///
+/// NO seals involved. Authentication comes from the transport binding the
+/// sender's identity (in CrucibleOS the kernel sets `sender: ProcessId`,
+/// which is unforgeable), not from a signature on the envelope.
 ///
 /// Cost: ~0.3 ms per message (vs. ~36 ms with seals)
 ///
 /// # Protocol
 ///
 /// ## Encapsulation (sender side)
-/// 1. `(mlkem_ct_R, mlkem_ss_R) = ML-KEM.Encap(recipient_pk)` — PQ shared secret with recipient
-/// 2. `(mlkem_ct_K, mlkem_ss_K) = ML-KEM.Encap(kernel_pk)` — PQ shared secret with kernel
-/// 3. `x25519_ss = X25519.DH(recipient_x25519_pk, ephemeral_sk)` — Classical shared secret
-/// 4. `channel_key = BLAKE3.derive_key("Temper.KernelChain.v1", mlkem_ss_R || mlkem_ss_K || x25519_ss)`
+/// 1. `(mlkem_ct_R, mlkem_ss_R) = ML-KEM.Encap(recipient_pk)` - PQ shared secret with recipient
+/// 2. `(mlkem_ct_E, mlkem_ss_E) = ML-KEM.Encap(escrow_pk)` - PQ shared secret with escrow holder
+/// 3. `x25519_ss = X25519.DH(recipient_x25519_pk, ephemeral_sk)` - Classical shared secret
+/// 4. `channel_key = BLAKE3.derive_key("Temper.Escrow.v1", mlkem_ss_R || mlkem_ss_E || x25519_ss)`
 /// 5. `ciphertext = ChaCha20-Poly1305.Encrypt(channel_key, plaintext)`
 ///
-/// ## Kernel Inspection (kernel side)
-/// 1. `mlkem_ss_K = ML-KEM.Decap(kernel_sk, mlkem_ct_K)` — Kernel's portion
-/// 2. Kernel stores `mlkem_ss_K` to provide to recipient during IPC_RECV
-/// 3. Kernel CAN derive `channel_key` if it also decaps `mlkem_ct_R` (only if kernel holds all keys)
-///    OR kernel can inspect by deriving a partial key for logging/auditing
+/// ## Share extraction (escrow holder side)
+/// 1. `mlkem_ss_E = ML-KEM.Decap(escrow_sk, mlkem_ct_E)` - the escrow holder's portion
+/// 2. The holder passes `mlkem_ss_E` to the recipient out of band; in
+///    CrucibleOS the kernel stores it in the process table and delivers it
+///    with the message on IPC_RECV.
+/// 3. The holder alone cannot derive `channel_key` (it holds neither
+///    `mlkem_ss_R` nor `x25519_ss`), so it can attest that a message
+///    passed through but cannot read it.
 ///
-/// ## Decapsulation (recipient side)  
-/// 1. `mlkem_ss_R = ML-KEM.Decap(recipient_sk, mlkem_ct_R)` — Recipient's portion
-/// 2. `mlkem_ss_K` = received from kernel via secure PCB slot during IPC_RECV
-/// 3. `x25519_ss = X25519.DH(x25519_ephemeral_pk, recipient_x25519_sk)` — Classical
-/// 4. `channel_key = BLAKE3.derive_key("Temper.KernelChain.v1", mlkem_ss_R || mlkem_ss_K || x25519_ss)`
+/// ## Decapsulation (recipient side)
+/// 1. `mlkem_ss_R = ML-KEM.Decap(recipient_sk, mlkem_ct_R)` - Recipient's portion
+/// 2. `mlkem_ss_E` = received from the escrow holder
+/// 3. `x25519_ss = X25519.DH(x25519_ephemeral_pk, recipient_x25519_sk)` - Classical
+/// 4. `channel_key = BLAKE3.derive_key("Temper.Escrow.v1", mlkem_ss_R || mlkem_ss_E || x25519_ss)`
 /// 5. `plaintext = ChaCha20-Poly1305.Decrypt(channel_key, ciphertext)`
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct KernelChainEnvelope {
+pub struct EscrowEnvelope {
 	/// Schema version for future compatibility.
 	pub schema_version: u16,
 
 	/// ML-KEM-1024 ciphertext for the recipient (only recipient can Decap)
 	pub mlkem_ct_recipient: Vec<u8>,
 
-	/// ML-KEM-1024 ciphertext for the kernel (only kernel can Decap)
-	pub mlkem_ct_kernel: Vec<u8>,
+	/// ML-KEM-1024 ciphertext for the escrow holder (only the holder can Decap)
+	pub mlkem_ct_escrow: Vec<u8>,
 
 	/// Ephemeral X25519 public key (for classical DH with recipient)
 	pub x25519_ephemeral_pk: Vec<u8>,
@@ -269,7 +287,7 @@ pub struct ConcealmentPublicKey {
 	pub mlkem_public_key: Vec<u8>,
 	/// X25519 public key.
 	pub x25519_public_key: Vec<u8>,
-	/// `hex(BLAKE3(mlkem_pk || x25519_pk))` — the envelope keypair's id.
+	/// `hex(BLAKE3(mlkem_pk || x25519_pk))` - the envelope keypair's id.
 	pub key_id: String,
 }
 
@@ -302,14 +320,14 @@ impl ConcealmentPublicKey {
 	}
 
 	/// Encapsulate `plaintext` to these public keys. Equivalent to
-	/// [`encapsulate`] against the matching keypair — the KEM work does not
+	/// [`encapsulate`] against the matching keypair - the KEM work does not
 	/// touch a secret key.
 	pub fn encapsulate(&self, rng: &mut TemperEntropy, plaintext: &[u8]) -> Result<Envelope> {
 		encapsulate_to(rng, plaintext, &self.mlkem_public_key, &self.x25519_public_key)
 	}
 }
 
-/// `hex(BLAKE3(mlkem_pk || x25519_pk))` — the one place the concealment key
+/// `hex(BLAKE3(mlkem_pk || x25519_pk))` - the one place the concealment key
 /// id is defined.
 ///
 /// [`generate_envelope_keypair`] stamps this id onto a fresh keypair, and
@@ -329,7 +347,7 @@ fn concealment_key_id(mlkem_public_key: &[u8], x25519_public_key: &[u8]) -> Stri
 ///
 /// A thin wrapper over [`EnvelopeKeypair`], introduced so the role reads at
 /// the call site (`ConcealmentKeypair::generate` / `decapsulate`) and so the
-/// secret-bearing type is never the one that gets serialized onto the wire —
+/// secret-bearing type is never the one that gets serialized onto the wire -
 /// only [`ConcealmentPublicKey`] is `serde`.
 pub struct ConcealmentKeypair {
 	inner: EnvelopeKeypair,
@@ -368,7 +386,7 @@ impl ConcealmentKeypair {
 /// serves the seal of a peer identity: each call site derives a key from a
 /// per-session secret, a per-session transcript and a single acceptance, so no
 /// key is ever reached twice. Reusing a (key, nonce) pair with ChaCha20-Poly1305
-/// is catastrophic — it leaks the XOR of the plaintexts and, worse, the
+/// is catastrophic - it leaks the XOR of the plaintexts and, worse, the
 /// Poly1305 one-time key.
 ///
 /// [`encapsulate`] cannot serve this purpose: it is a KEM, it draws a fresh
@@ -448,7 +466,7 @@ pub fn encapsulate(rng: &mut TemperEntropy, plaintext: &[u8], keypair: &Envelope
 	encapsulate_to(rng, plaintext, &keypair.mlkem_public_key, &keypair.x25519_public_key)
 }
 
-/// Encapsulate to a raw public half — the shared body of [`encapsulate`] and
+/// Encapsulate to a raw public half - the shared body of [`encapsulate`] and
 /// [`ConcealmentPublicKey::encapsulate`].
 ///
 /// Takes the two public keys directly so a caller holding only the public
@@ -744,25 +762,25 @@ pub fn authenticated_decapsulate(
 	Ok((plaintext.to_vec(), seal))
 }
 
-/// Encapsulate plaintext into a kernel-chain envelope (dual-KEM).
+/// Encapsulate plaintext into an escrow envelope (dual-KEM).
 ///
-/// Both the recipient AND the kernel participate in key derivation,
+/// Both the recipient AND the escrow holder participate in key derivation,
 /// so both can independently derive the channel key.
 ///
 /// # Arguments
 /// * `rng` - Cryptographically secure RNG
 /// * `plaintext` - Data to encrypt
 /// * `recipient_keypair` - Recipient's envelope keypair
-/// * `kernel_keypair` - Kernel's envelope keypair (public key portion)
+/// * `escrow_keypair` - Escrow holder's envelope keypair (public key portion)
 ///
 /// # Performance
 /// ~0.3 ms per call (2× ML-KEM Encap + 1× X25519 DH + ChaCha20-Poly1305)
-pub fn kernel_chain_encapsulate(
+pub fn escrow_encapsulate(
 	rng: &mut TemperEntropy,
 	plaintext: &[u8],
 	recipient_keypair: &EnvelopeKeypair,
-	kernel_keypair: &EnvelopeKeypair,
-) -> Result<KernelChainEnvelope> {
+	escrow_keypair: &EnvelopeKeypair,
+) -> Result<EscrowEnvelope> {
 	// 1. ML-KEM Encap with recipient's public key
 	let mlkem_ek_recipient_encoded: &Encoded<ml_kem::kem::EncapsulationKey<MlKem1024Params>> = recipient_keypair
 		.mlkem_public_key
@@ -780,22 +798,22 @@ pub fn kernel_chain_encapsulate(
 		.try_into()
 		.map_err(|_| Error::CryptoError("ML-KEM recipient shared secret size mismatch".into()))?;
 
-	// 2. ML-KEM Encap with kernel's public key
-	let mlkem_ek_kernel_encoded: &Encoded<ml_kem::kem::EncapsulationKey<MlKem1024Params>> = kernel_keypair
+	// 2. ML-KEM Encap with the escrow holder's public key
+	let mlkem_ek_escrow_encoded: &Encoded<ml_kem::kem::EncapsulationKey<MlKem1024Params>> = escrow_keypair
 		.mlkem_public_key
 		.as_slice()
 		.try_into()
-		.map_err(|_| Error::CryptoError("Invalid kernel ML-KEM public key bytes".into()))?;
-	let mlkem_ek_kernel = ml_kem::kem::EncapsulationKey::<MlKem1024Params>::from_bytes(mlkem_ek_kernel_encoded);
+		.map_err(|_| Error::CryptoError("Invalid escrow ML-KEM public key bytes".into()))?;
+	let mlkem_ek_escrow = ml_kem::kem::EncapsulationKey::<MlKem1024Params>::from_bytes(mlkem_ek_escrow_encoded);
 
-	let (mlkem_ct_kernel, mlkem_ss_kernel) = mlkem_ek_kernel
+	let (mlkem_ct_escrow, mlkem_ss_escrow) = mlkem_ek_escrow
 		.encapsulate(rng)
-		.map_err(|_| Error::CryptoError("ML-KEM encapsulation failed (kernel)".into()))?;
+		.map_err(|_| Error::CryptoError("ML-KEM encapsulation failed (escrow)".into()))?;
 
-	let mlkem_ss_kernel_slice: &[u8] = mlkem_ss_kernel.as_ref();
-	let mlkem_ss_kernel_bytes: [u8; 32] = mlkem_ss_kernel_slice
+	let mlkem_ss_escrow_slice: &[u8] = mlkem_ss_escrow.as_ref();
+	let mlkem_ss_escrow_bytes: [u8; 32] = mlkem_ss_escrow_slice
 		.try_into()
-		.map_err(|_| Error::CryptoError("ML-KEM kernel shared secret size mismatch".into()))?;
+		.map_err(|_| Error::CryptoError("ML-KEM escrow shared secret size mismatch".into()))?;
 
 	// 3. Generate ephemeral X25519 key and DH with recipient
 	let (x25519_ephemeral_sk_bytes, x25519_ephemeral_pk_bytes) = x25519_keygen(rng);
@@ -809,20 +827,20 @@ pub fn kernel_chain_encapsulate(
 	);
 	let x25519_ss = x25519_ephemeral_sk.diffie_hellman(&x25519_recipient_pk);
 
-	// 4. Combine: mlkem_ss_R || mlkem_ss_K || x25519_ss (96 bytes)
-	let mut combined_ss = [0u8; KERNEL_CHAIN_COMBINED_SS_SIZE];
+	// 4. Combine: mlkem_ss_R || mlkem_ss_E || x25519_ss (96 bytes)
+	let mut combined_ss = [0u8; ESCROW_COMBINED_SS_SIZE];
 	combined_ss[..MLKEM_SS_SIZE].copy_from_slice(&mlkem_ss_recipient_bytes);
-	combined_ss[MLKEM_SS_SIZE..MLKEM_SS_SIZE * 2].copy_from_slice(&mlkem_ss_kernel_bytes);
+	combined_ss[MLKEM_SS_SIZE..MLKEM_SS_SIZE * 2].copy_from_slice(&mlkem_ss_escrow_bytes);
 	combined_ss[MLKEM_SS_SIZE * 2..].copy_from_slice(x25519_ss.as_bytes());
 
 	// 5. Derive channel key
-	let channel_key = blake3::derive_key(DOMAIN_KERNEL_CHAIN, &combined_ss);
+	let channel_key = blake3::derive_key(DOMAIN_ESCROW, &combined_ss);
 
 	// 6. Zeroize intermediate secrets
 	let mut mlkem_ss_r_copy = mlkem_ss_recipient_bytes;
-	let mut mlkem_ss_k_copy = mlkem_ss_kernel_bytes;
+	let mut mlkem_ss_e_copy = mlkem_ss_escrow_bytes;
 	mlkem_ss_r_copy.zeroize();
-	mlkem_ss_k_copy.zeroize();
+	mlkem_ss_e_copy.zeroize();
 	combined_ss.zeroize();
 
 	// 7. Encrypt with ChaCha20-Poly1305
@@ -833,22 +851,22 @@ pub fn kernel_chain_encapsulate(
 	let cipher = ChaCha20Poly1305::new(&channel_key.into());
 	let ciphertext = cipher
 		.encrypt(nonce, plaintext)
-		.map_err(|_| Error::CryptoError("ChaCha20-Poly1305 encryption failed (kernel chain)".into()))?;
+		.map_err(|_| Error::CryptoError("ChaCha20-Poly1305 encryption failed (escrow)".into()))?;
 
 	// 8. Compute envelope ID
 	let mut hasher = blake3::Hasher::new();
 	hasher.update(&SCHEMA_VERSION.to_le_bytes());
 	hasher.update(mlkem_ct_recipient.as_ref());
-	hasher.update(mlkem_ct_kernel.as_ref());
+	hasher.update(mlkem_ct_escrow.as_ref());
 	hasher.update(&x25519_ephemeral_pk_bytes);
 	hasher.update(&ciphertext);
 	hasher.update(&nonce_bytes);
 	let envelope_id = hex::encode(hasher.finalize().as_bytes());
 
-	Ok(KernelChainEnvelope {
+	Ok(EscrowEnvelope {
 		schema_version: SCHEMA_VERSION,
 		mlkem_ct_recipient: mlkem_ct_recipient.to_vec(),
-		mlkem_ct_kernel: mlkem_ct_kernel.to_vec(),
+		mlkem_ct_escrow: mlkem_ct_escrow.to_vec(),
 		x25519_ephemeral_pk: x25519_ephemeral_pk_bytes,
 		ciphertext,
 		nonce: nonce_bytes.to_vec(),
@@ -856,20 +874,20 @@ pub fn kernel_chain_encapsulate(
 	})
 }
 
-/// Decapsulate a kernel-chain envelope to recover plaintext.
+/// Decapsulate a escrow envelope to recover plaintext.
 ///
-/// Requires the recipient's keypair AND the kernel's shared secret
-/// (provided by the kernel during IPC delivery).
+/// Requires the recipient's keypair AND the escrow holder's shared secret
+/// (provided by the escrow holder at delivery).
 ///
 /// # Arguments
-/// * `envelope` - The kernel-chain envelope to decrypt
+/// * `envelope` - The escrow envelope to decrypt
 /// * `recipient_keypair` - Recipient's envelope keypair (with secret keys)
-/// * `kernel_shared_secret` - The kernel's ML-KEM shared secret (32 bytes),
-///   provided by the kernel via a secure PCB slot during IPC_RECV
-pub fn kernel_chain_decapsulate(
-	envelope: &KernelChainEnvelope,
+/// * `escrow_shared_secret` - The escrow holder's ML-KEM shared secret (32 bytes),
+///   provided by the escrow holder alongside the ciphertext
+pub fn escrow_decapsulate(
+	envelope: &EscrowEnvelope,
 	recipient_keypair: &EnvelopeKeypair,
-	kernel_shared_secret: &[u8; 32],
+	escrow_shared_secret: &[u8; 32],
 ) -> Result<Vec<u8>> {
 	// 1. ML-KEM Decap with recipient's secret key
 	let mlkem_dk_encoded: &Encoded<ml_kem::kem::DecapsulationKey<MlKem1024Params>> = recipient_keypair
@@ -894,8 +912,8 @@ pub fn kernel_chain_decapsulate(
 		.try_into()
 		.map_err(|_| Error::CryptoError("ML-KEM recipient shared secret size mismatch".into()))?;
 
-	// 2. Kernel shared secret is provided by kernel
-	let mlkem_ss_kernel_bytes = kernel_shared_secret;
+	// 2. The escrow holder's share arrives alongside the envelope
+	let mlkem_ss_escrow_bytes = escrow_shared_secret;
 
 	// 3. X25519 DH
 	let x25519_static_sk = X25519SecretKey::from(
@@ -908,14 +926,14 @@ pub fn kernel_chain_decapsulate(
 	);
 	let x25519_ss = x25519_static_sk.diffie_hellman(&x25519_ephemeral_pk);
 
-	// 4. Combine: mlkem_ss_R || mlkem_ss_K || x25519_ss
-	let mut combined_ss = [0u8; KERNEL_CHAIN_COMBINED_SS_SIZE];
+	// 4. Combine: mlkem_ss_R || mlkem_ss_E || x25519_ss
+	let mut combined_ss = [0u8; ESCROW_COMBINED_SS_SIZE];
 	combined_ss[..MLKEM_SS_SIZE].copy_from_slice(&mlkem_ss_recipient_bytes);
-	combined_ss[MLKEM_SS_SIZE..MLKEM_SS_SIZE * 2].copy_from_slice(mlkem_ss_kernel_bytes);
+	combined_ss[MLKEM_SS_SIZE..MLKEM_SS_SIZE * 2].copy_from_slice(mlkem_ss_escrow_bytes);
 	combined_ss[MLKEM_SS_SIZE * 2..].copy_from_slice(x25519_ss.as_bytes());
 
 	// 5. Derive channel key
-	let channel_key = blake3::derive_key(DOMAIN_KERNEL_CHAIN, &combined_ss);
+	let channel_key = blake3::derive_key(DOMAIN_ESCROW, &combined_ss);
 
 	// 6. Zeroize intermediate secrets
 	let mut mlkem_ss_r_copy = mlkem_ss_recipient_bytes;
@@ -933,47 +951,44 @@ pub fn kernel_chain_decapsulate(
 	Ok(plaintext)
 }
 
-/// Kernel-side inspection: extract the kernel's shared secret from an envelope.
+/// Escrow-holder side: extract the holder's shared secret from an envelope.
 ///
-/// This allows the kernel to participate in key derivation. The kernel
+/// This lets the escrow holder participate in key derivation. The holder
 /// can either:
-/// - Just extract `mlkem_ss_K` to pass to the recipient for decryption
+/// - Just extract `mlkem_ss_E` to pass to the recipient for decryption
 /// - Fully decrypt if it also has the recipient's keys (e.g., for auditing)
 ///
 /// # Arguments
-/// * `envelope` - The kernel-chain envelope
-/// * `kernel_keypair` - Kernel's envelope keypair (with secret keys)
+/// * `envelope` - The escrow envelope
+/// * `escrow_keypair` - Escrow holder's envelope keypair (with secret keys)
 ///
 /// # Returns
-/// The kernel's ML-KEM shared secret (32 bytes)
-pub fn kernel_chain_extract_secret(
-	envelope: &KernelChainEnvelope,
-	kernel_keypair: &EnvelopeKeypair,
-) -> Result<[u8; 32]> {
-	// ML-KEM Decap with kernel's secret key
-	let mlkem_dk_encoded: &Encoded<ml_kem::kem::DecapsulationKey<MlKem1024Params>> = kernel_keypair
+/// The escrow holder's ML-KEM shared secret (32 bytes)
+pub fn escrow_extract_secret(envelope: &EscrowEnvelope, escrow_keypair: &EnvelopeKeypair) -> Result<[u8; 32]> {
+	// ML-KEM Decap with the escrow holder's secret key
+	let mlkem_dk_encoded: &Encoded<ml_kem::kem::DecapsulationKey<MlKem1024Params>> = escrow_keypair
 		.mlkem_secret_key
 		.as_slice()
 		.try_into()
-		.map_err(|_| Error::CryptoError("Invalid kernel ML-KEM secret key bytes".into()))?;
+		.map_err(|_| Error::CryptoError("Invalid escrow ML-KEM secret key bytes".into()))?;
 	let mlkem_dk = ml_kem::kem::DecapsulationKey::<MlKem1024Params>::from_bytes(mlkem_dk_encoded);
 
 	let ct_ref: &Ciphertext<MlKem1024> = envelope
-		.mlkem_ct_kernel
+		.mlkem_ct_escrow
 		.as_slice()
 		.try_into()
-		.map_err(|_| Error::CryptoError("Invalid ML-KEM kernel ciphertext length".into()))?;
+		.map_err(|_| Error::CryptoError("Invalid ML-KEM escrow ciphertext length".into()))?;
 
-	let mlkem_ss_kernel = mlkem_dk
+	let mlkem_ss_escrow = mlkem_dk
 		.decapsulate(ct_ref)
-		.map_err(|_| Error::CryptoError("ML-KEM decapsulation failed (kernel)".into()))?;
+		.map_err(|_| Error::CryptoError("ML-KEM decapsulation failed (escrow)".into()))?;
 
-	let mlkem_ss_kernel_slice: &[u8] = mlkem_ss_kernel.as_ref();
-	let mlkem_ss_kernel_bytes: [u8; 32] = mlkem_ss_kernel_slice
+	let mlkem_ss_escrow_slice: &[u8] = mlkem_ss_escrow.as_ref();
+	let mlkem_ss_escrow_bytes: [u8; 32] = mlkem_ss_escrow_slice
 		.try_into()
-		.map_err(|_| Error::CryptoError("ML-KEM kernel shared secret size mismatch".into()))?;
+		.map_err(|_| Error::CryptoError("ML-KEM escrow shared secret size mismatch".into()))?;
 
-	Ok(mlkem_ss_kernel_bytes)
+	Ok(mlkem_ss_escrow_bytes)
 }
 
 // endregion: --- Public API

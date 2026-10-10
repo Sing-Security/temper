@@ -3,10 +3,10 @@
 //! Two-party ephemeral handshake using ML-KEM-1024 + X25519, producing a
 //! shared 32-byte session key both sides derive independently. This is the
 //! same protocol shape as `temper-cbl`'s cross-node `session.rs` (that one
-//! stays as-is — it registers keys with the kernel session table and is
+//! stays as-is - it registers keys with the kernel session table and is
 //! wired into IPC), generalized here so any `envelope`-feature consumer of
 //! this crate can reuse the exact same reviewed KEM/DH/KDF logic without
-//! re-deriving it — notably a browser-side WASM client, which cannot depend
+//! re-deriving it - notably a browser-side WASM client, which cannot depend
 //! on a CrucibleOS kernel-target crate like `temper-cbl` at all.
 //!
 //! # Protocol
@@ -26,7 +26,7 @@
 //! )
 //! ```
 //!
-//! This is a bare key-agreement primitive — it provides forward secrecy
+//! This is a bare key-agreement primitive - it provides forward secrecy
 //! (fully ephemeral on both sides) but, on its own, no protection against an
 //! active man-in-the-middle: neither side authenticates the other's identity
 //! key against anything pinned in advance. Callers that need that guarantee
@@ -57,7 +57,7 @@ const DOMAIN_HANDSHAKE: &str = "Temper.Handshake.v1";
 /// postcard varint-encodes a `u64`, so the encoded length of a uniformly
 /// random id depends on the draw: below 2^56 it takes 8 bytes, at or above
 /// it takes 9. That makes every flight's length vary by one byte with a
-/// value nothing controls — a golden vector, a buffer size, or an MTU
+/// value nothing controls - a golden vector, a buffer size, or an MTU
 /// calculation that is right for one handshake is off by one for the next
 /// (this was observed in practice: the pinned flights of the demo, 3698 and
 /// 24131 bytes, came out 3697 and 24130 on a live run).
@@ -73,7 +73,7 @@ const SESSION_ID_MARKER: u64 = 1 << 63;
 pub struct HandshakeProposal {
 	/// Session identifier chosen by the initiator (random).
 	pub session_id: u64,
-	/// Initiator's identity tag (opaque to this module — e.g. a BLAKE3 hash
+	/// Initiator's identity tag (opaque to this module - e.g. a BLAKE3 hash
 	/// of a longer-lived identity, or all-zero if the caller has none).
 	pub initiator_id: [u8; 32],
 	/// Initiator's ephemeral X25519 public key.
@@ -205,7 +205,7 @@ pub fn accept(
 	Ok((acceptance, state))
 }
 
-/// Derive the shared session key — initiator side. Decapsulates the
+/// Derive the shared session key - initiator side. Decapsulates the
 /// responder's ML-KEM ciphertext and performs X25519 DH against the
 /// responder's ephemeral public key.
 pub fn finalize_initiator(
@@ -244,7 +244,7 @@ pub fn finalize_initiator(
 	))
 }
 
-/// Derive the shared session key — responder side. The ML-KEM shared secret
+/// Derive the shared session key - responder side. The ML-KEM shared secret
 /// was already computed during [`accept`]; only the X25519 DH step remains.
 pub fn finalize_responder(
 	proposal: &HandshakeProposal,

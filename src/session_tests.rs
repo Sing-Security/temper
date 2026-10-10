@@ -2,7 +2,7 @@
 //! concealment, the anti-DoS cookie gate, version dispatch, and a tamper case
 //! per concealed field.
 //!
-//! Deterministic by construction — every fixture runs off
+//! Deterministic by construction - every fixture runs off
 //! `TemperEntropy::from_seed`.
 //!
 //! The conformance suite in `session_math_tests.rs` recomputes the spec
@@ -35,7 +35,7 @@ fn test_round_trip_is_mutually_authenticated() -> TestResult<()> {
 	// -- Setup & Fixtures
 	let (client, server, client_kp, server_kp) = establish(0x20, 0x21, &PeerPolicy::AcceptAny, &PeerPolicy::AcceptAny)?;
 
-	// -- Check: same session, each side authenticated THE other side — and
+	// -- Check: same session, each side authenticated THE other side - and
 	// each side learned that peer's identity only by opening a seal.
 	assert_eq!(client.session_id, server.session_id);
 	assert_eq!(client.peer.key_id, server_kp.key_id);
@@ -59,7 +59,7 @@ fn test_records_interop_in_both_directions() -> TestResult<()> {
 	assert_eq!(pong, b"pong");
 
 	// Negative control: the key schedule still gives each direction its
-	// own key — a C2S record must not open on the initiator's receive side.
+	// own key - a C2S record must not open on the initiator's receive side.
 	assert!(client.record.recv().open(&c2s).is_err());
 	Ok(())
 }
@@ -112,7 +112,7 @@ fn test_flight1_hides_the_initiator_identity() -> TestResult<()> {
 	let (init, _state) = initiate(&mut c_rng, &client, None, &concealment.public(), [0u8; 32])?;
 	let bytes = postcard_bytes(&init)?;
 
-	// -- Check, positive control: the search is not broken — the keys ARE
+	// -- Check, positive control: the search is not broken - the keys ARE
 	// findable in a byte string that does contain them.
 	let mut haystack = alloc::vec![0u8; 8];
 	haystack.extend_from_slice(&client.mldsa_public_key);
@@ -168,7 +168,7 @@ fn test_responder_recovers_the_initiator_identity() -> TestResult<()> {
 	let rig = rig(0x34)?;
 
 	// -- Check: the identity the responder acts on came out of the seal, and
-	// is the initiator's — not merely "some identity that agrees with itself".
+	// is the initiator's - not merely "some identity that agrees with itself".
 	assert_eq!(rig.s_state.initiator.key_id, rig.client.key_id);
 	assert_eq!(rig.s_state.initiator.mldsa_pk, rig.client.mldsa_public_key);
 	Ok(())
@@ -273,7 +273,7 @@ fn test_missing_cookie_is_refused() -> TestResult<()> {
 
 #[test]
 fn test_cookie_bound_to_another_peer_tag_is_refused() -> TestResult<()> {
-	// -- Setup & Fixtures: a valid cookie, but issued to a different peer —
+	// -- Setup & Fixtures: a valid cookie, but issued to a different peer -
 	// one client must not be able to redeem another's.
 	let mut c_rng = seeded_rng(0x44);
 	let mut s_rng = seeded_rng(0x45);
@@ -338,7 +338,7 @@ fn test_cookie_is_checked_before_the_expensive_work() -> TestResult<()> {
 		Some(ctx),
 	);
 
-	// -- Check: the cookie is the verdict, so the gate ran first — an
+	// -- Check: the cookie is the verdict, so the gate ran first - an
 	// unvalidated peer is refused before the decapsulation and before either
 	// signature.
 	assert_protocol_error(bad_cookie.map(|_| ()), "session cookie missing or invalid");
@@ -422,7 +422,7 @@ fn test_peek_version_reads_the_wire_version() -> TestResult<()> {
 	let (init, _) = initiate(&mut c_rng, &client, None, &concealment.public(), [0u8; 32])?;
 
 	// -- Check: the peek reads the same field the full decoders read, and it is
-	// the sender's to set — flight 1 carries no signature, so this is a routing
+	// the sender's to set - flight 1 carries no signature, so this is a routing
 	// hint, not an authenticated downgrade defence.
 	let mut bytes = postcard_bytes(&init)?;
 	assert_eq!(peek_version(&bytes)?, PROTOCOL_VERSION);
@@ -474,7 +474,7 @@ fn test_tampered_sealed_responder_is_rejected() -> TestResult<()> {
 #[test]
 fn test_tampered_confirm_mac_is_rejected() -> TestResult<()> {
 	// -- Setup & Fixtures: the confirm MAC is NOT inside H2 (see the
-	// transcript docs), so it is the MAC check — not the signature check —
+	// transcript docs), so it is the MAC check - not the signature check -
 	// that must catch this.
 	let (mut c_rng, init, mut accept, c_state, _) = through_accept(0x62)?;
 	accept.body.responder_confirm[0] ^= 0x01;
@@ -491,7 +491,7 @@ fn test_tampered_confirm_mac_is_rejected() -> TestResult<()> {
 fn test_signatures_that_do_not_cover_h2_are_rejected() -> TestResult<()> {
 	// -- Setup & Fixtures: replace the responder's signatures over H2 with
 	// signatures over some other message. The sealed identity still opens, so
-	// execution reaches the signature step — which must reject.
+	// execution reaches the signature step - which must reject.
 	let (mut c_rng, init, mut accept, c_state, _) = through_accept(0x63)?;
 	let mut k_rng = seeded_rng(0x64);
 	let impostor = make_keypair(&mut k_rng, "impostor@example");
@@ -617,7 +617,7 @@ fn contains(haystack: &[u8], needle: &[u8]) -> bool {
 }
 
 /// Flights 1–2 of a handshake, plus the initiator's rng (flight 3 still
-/// signs) and both post-accept states — for tamper and inspect tests.
+/// signs) and both post-accept states - for tamper and inspect tests.
 struct Rig {
 	c_rng: TemperEntropy,
 	client: TemperKeypair,

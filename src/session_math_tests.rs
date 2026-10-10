@@ -1,7 +1,7 @@
 //! Mathematical conformance tests for the session protocol.
 //!
 //! Every expected value here is recomputed from the formulas in `PROTOCOL.md`
-//! with raw BLAKE3 / ChaCha20-Poly1305 calls — never by calling this crate's
+//! with raw BLAKE3 / ChaCha20-Poly1305 calls - never by calling this crate's
 //! transcript or KDF helpers. The domain strings are spelled out literally so
 //! that changing one in the source fails these tests instead of silently
 //! changing the wire protocol.
@@ -10,9 +10,9 @@
 //! initiator it builds flight 1 itself and constructs flight 2 exactly as the
 //! spec says, which the crate's initiator must accept; as responder it hands a
 //! spec-built flight 1 to the crate and checks the crate's flight 2 against
-//! values it recomputed. Where the spec admits a plausible wrong variant —
+//! values it recomputed. Where the spec admits a plausible wrong variant -
 //! a seal key that folds in H2, one that drops the secret, H2 over the
-//! plaintext identity instead of the ciphertext — a negative control asserts
+//! plaintext identity instead of the ciphertext - a negative control asserts
 //! the wrong variant does **not** reproduce what the implementation produced.
 
 #![cfg(all(test, feature = "session"))]
@@ -39,7 +39,7 @@ use chacha20poly1305::{
 
 type TestResult<T> = core::result::Result<T, Box<dyn core::error::Error>>; // For tests.
 
-// region:    --- Spec constants (literal — see the module docs)
+// region:    --- Spec constants (literal - see the module docs)
 
 const DOMAIN: &str = "Temper.Session.v2";
 const DOMAIN_SERVER_CONFIRM: &str = "Temper.Session.v2.ServerConfirm";
@@ -49,7 +49,7 @@ const DOMAIN_S2C: &str = "Temper.Session.v2.S2C";
 const DOMAIN_RESPONDER_SEAL: &str = "Temper.Session.v2.ResponderSeal";
 const AAD_RESPONDER_SEAL: &[u8] = DOMAIN_RESPONDER_SEAL.as_bytes();
 
-// endregion: --- Spec constants (literal — see the module docs)
+// endregion: --- Spec constants (literal - see the module docs)
 
 // region:    --- Spec constructions (independent of the crate's helpers)
 
@@ -135,7 +135,7 @@ fn identity_tag(mldsa_pk: &[u8], slhdsa_pk: &[u8]) -> [u8; 32] {
 	hash(&[mldsa_pk, slhdsa_pk])
 }
 
-/// ChaCha20-Poly1305 under a raw key, all-zero nonce, with AAD — the spec's
+/// ChaCha20-Poly1305 under a raw key, all-zero nonce, with AAD - the spec's
 /// `aead_seal`, written out rather than called.
 fn aead_seal_spec(key: &[u8; 32], aad: &[u8], plaintext: &[u8]) -> TestResult<Vec<u8>> {
 	let cipher = ChaCha20Poly1305::new(key.into());
@@ -264,11 +264,11 @@ fn test_flight_two_matches_the_spec() -> TestResult<()> {
 	)?;
 
 	// -- Check: the seal opens under a key the spec derives from the secret,
-	// H1 and the acceptance — so the implementation's H1 and seal key both
+	// H1 and the acceptance - so the implementation's H1 and seal key both
 	// match the formula. (Wrong either way and this fails to authenticate.)
 	//
 	// The secret comes from `finalize_initiator`, which needs only the
-	// initiator's own ephemeral state — which is why this test plays the
+	// initiator's own ephemeral state - which is why this test plays the
 	// initiator: a test that played the responder would have to reconstruct
 	// the responder's ephemeral secrets, and could only do so by trusting the
 	// very implementation it is checking.
@@ -412,7 +412,7 @@ fn test_a_spec_built_flight_two_is_accepted_by_the_initiator() -> TestResult<()>
 #[test]
 fn test_seal_key_does_not_fold_in_h2() -> TestResult<()> {
 	// -- Setup & Fixtures: a real flight 2, and the key that would have been
-	// used had the seal key been derived from H2 — which contains the
+	// used had the seal key been derived from H2 - which contains the
 	// ciphertext the key protects, and so is circular.
 	let t = SpecInitiator::run(0x88, 0x89)?;
 	let mut s_rng = t.s_rng;
@@ -441,7 +441,7 @@ fn test_seal_key_does_not_fold_in_h2() -> TestResult<()> {
 
 	// -- Check: the circular key does not open the real ciphertext. If the
 	// implementation had used it, the spec key would not have opened it
-	// either — and the test above asserts that it does.
+	// either - and the test above asserts that it does.
 	assert_ne!(circular_key, responder_seal_key(&secret, &h1, &accept.body.acceptance)?);
 	assert!(aead_open_spec(&circular_key, AAD_RESPONDER_SEAL, &accept.body.sealed_responder).is_err());
 	Ok(())
@@ -473,8 +473,8 @@ fn test_seal_key_covers_the_session_secret() -> TestResult<()> {
 	without_secret.update(&postcard_bytes(&accept.body.acceptance)?);
 	let key = *without_secret.finalize().as_bytes();
 
-	// -- Check: anyone can derive this key — the acceptance is on the wire and
-	// H1 is computable from flight 1 — so it must not be the real one.
+	// -- Check: anyone can derive this key - the acceptance is on the wire and
+	// H1 is computable from flight 1 - so it must not be the real one.
 	assert!(aead_open_spec(&key, AAD_RESPONDER_SEAL, &accept.body.sealed_responder).is_err());
 
 	// The other plausible variant: the right parts, wrong order.
@@ -625,7 +625,7 @@ fn test_seal_is_bound_to_its_associated_data() -> TestResult<()> {
 
 #[test]
 fn test_sealed_identity_key_id_must_match_its_keys() -> TestResult<()> {
-	// -- Setup & Fixtures: a well-formed seal over a dishonest identity — the
+	// -- Setup & Fixtures: a well-formed seal over a dishonest identity - the
 	// key_id does not hash to the keys beside it.
 	let mut c_rng = seeded_rng(0x92);
 	let mut s_rng = seeded_rng(0x93);
@@ -683,7 +683,7 @@ fn test_every_domain_is_distinct() -> TestResult<()> {
 	let bytes = postcard_bytes(&t.init)?;
 
 	// -- Check: no two domains name the same transcript. If two did, a value
-	// derived for one purpose would verify for the other — a confirm MAC
+	// derived for one purpose would verify for the other - a confirm MAC
 	// reusable as a record key, or one direction's keys usable as the other's.
 	let domains: [&[u8]; 6] = [
 		DOMAIN.as_bytes(),

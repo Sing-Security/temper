@@ -497,26 +497,26 @@ fn test_envelope_authenticated_with_compression() -> Result<()> {
 	Ok(())
 }
 
-// region:    --- Kernel Chain Envelope Tests
+// region:    --- Escrow Envelope Tests
 
 #[test]
-fn test_envelope_kernel_chain_roundtrip() -> Result<()> {
-	// Property: Kernel chain encapsulate → extract secret → decapsulate should recover plaintext
+fn test_envelope_escrow_roundtrip() -> Result<()> {
+	// Property: Holder chain encapsulate → extract secret → decapsulate should recover plaintext
 
 	// -- Setup & Fixtures
 	let mut rng = TemperEntropy::from_seed([0x80; 32]);
 	let recipient_keypair = generate_envelope_keypair(&mut rng)?;
-	let kernel_keypair = generate_envelope_keypair(&mut rng)?;
-	let plaintext = b"Secret IPC message for kernel chain";
+	let escrow_keypair = generate_envelope_keypair(&mut rng)?;
+	let plaintext = b"Secret IPC message for escrow";
 
 	// -- Exec
-	let envelope = crate::envelope::kernel_chain_encapsulate(&mut rng, plaintext, &recipient_keypair, &kernel_keypair)?;
+	let envelope = crate::envelope::escrow_encapsulate(&mut rng, plaintext, &recipient_keypair, &escrow_keypair)?;
 
-	// Kernel extracts its shared secret
-	let kernel_secret = crate::envelope::kernel_chain_extract_secret(&envelope, &kernel_keypair)?;
+	// Holder extracts its shared secret
+	let holder_secret = crate::envelope::escrow_extract_secret(&envelope, &escrow_keypair)?;
 
-	// Recipient decapsulates with kernel secret
-	let recovered = crate::envelope::kernel_chain_decapsulate(&envelope, &recipient_keypair, &kernel_secret)?;
+	// Recipient decapsulates with holder secret
+	let recovered = crate::envelope::escrow_decapsulate(&envelope, &recipient_keypair, &holder_secret)?;
 
 	// -- Check
 	assert_eq!(
@@ -528,24 +528,23 @@ fn test_envelope_kernel_chain_roundtrip() -> Result<()> {
 }
 
 #[test]
-fn test_envelope_kernel_chain_wrong_recipient_key_fails() -> Result<()> {
+fn test_envelope_escrow_wrong_recipient_key_fails() -> Result<()> {
 	// Property: Decapsulation with wrong recipient key should fail
 
 	// -- Setup & Fixtures
 	let mut rng = TemperEntropy::from_seed([0x81; 32]);
 	let recipient_keypair1 = generate_envelope_keypair(&mut rng)?;
 	let recipient_keypair2 = generate_envelope_keypair(&mut rng)?;
-	let kernel_keypair = generate_envelope_keypair(&mut rng)?;
+	let escrow_keypair = generate_envelope_keypair(&mut rng)?;
 	let plaintext = b"Secret message";
 
 	// -- Exec
-	let envelope =
-		crate::envelope::kernel_chain_encapsulate(&mut rng, plaintext, &recipient_keypair1, &kernel_keypair)?;
+	let envelope = crate::envelope::escrow_encapsulate(&mut rng, plaintext, &recipient_keypair1, &escrow_keypair)?;
 
-	let kernel_secret = crate::envelope::kernel_chain_extract_secret(&envelope, &kernel_keypair)?;
+	let holder_secret = crate::envelope::escrow_extract_secret(&envelope, &escrow_keypair)?;
 
 	// Try to decapsulate with wrong recipient key
-	let result = crate::envelope::kernel_chain_decapsulate(&envelope, &recipient_keypair2, &kernel_secret);
+	let result = crate::envelope::escrow_decapsulate(&envelope, &recipient_keypair2, &holder_secret);
 
 	// -- Check
 	assert!(result.is_err(), "Decapsulation with wrong recipient key should fail");
@@ -553,50 +552,49 @@ fn test_envelope_kernel_chain_wrong_recipient_key_fails() -> Result<()> {
 }
 
 #[test]
-fn test_envelope_kernel_chain_wrong_kernel_secret_fails() -> Result<()> {
-	// Property: Decapsulation with wrong kernel secret should fail
+fn test_envelope_escrow_wrong_holder_secret_fails() -> Result<()> {
+	// Property: Decapsulation with wrong holder secret should fail
 
 	// -- Setup & Fixtures
 	let mut rng = TemperEntropy::from_seed([0x82; 32]);
 	let recipient_keypair = generate_envelope_keypair(&mut rng)?;
-	let kernel_keypair = generate_envelope_keypair(&mut rng)?;
+	let escrow_keypair = generate_envelope_keypair(&mut rng)?;
 	let plaintext = b"Secret message";
 
 	// -- Exec
-	let envelope = crate::envelope::kernel_chain_encapsulate(&mut rng, plaintext, &recipient_keypair, &kernel_keypair)?;
+	let envelope = crate::envelope::escrow_encapsulate(&mut rng, plaintext, &recipient_keypair, &escrow_keypair)?;
 
-	// Use wrong kernel secret (all zeros)
-	let wrong_kernel_secret = [0u8; 32];
+	// Use wrong holder secret (all zeros)
+	let wrong_holder_secret = [0u8; 32];
 
-	let result = crate::envelope::kernel_chain_decapsulate(&envelope, &recipient_keypair, &wrong_kernel_secret);
+	let result = crate::envelope::escrow_decapsulate(&envelope, &recipient_keypair, &wrong_holder_secret);
 
 	// -- Check
-	assert!(result.is_err(), "Decapsulation with wrong kernel secret should fail");
+	assert!(result.is_err(), "Decapsulation with wrong holder secret should fail");
 	Ok(())
 }
 
 #[test]
-fn test_envelope_kernel_chain_tampered_ciphertext_fails() -> Result<()> {
+fn test_envelope_escrow_tampered_ciphertext_fails() -> Result<()> {
 	// Property: Tampered ciphertext should fail authentication
 
 	// -- Setup & Fixtures
 	let mut rng = TemperEntropy::from_seed([0x83; 32]);
 	let recipient_keypair = generate_envelope_keypair(&mut rng)?;
-	let kernel_keypair = generate_envelope_keypair(&mut rng)?;
+	let escrow_keypair = generate_envelope_keypair(&mut rng)?;
 	let plaintext = b"Secret message";
 
 	// -- Exec
-	let mut envelope =
-		crate::envelope::kernel_chain_encapsulate(&mut rng, plaintext, &recipient_keypair, &kernel_keypair)?;
+	let mut envelope = crate::envelope::escrow_encapsulate(&mut rng, plaintext, &recipient_keypair, &escrow_keypair)?;
 
-	let kernel_secret = crate::envelope::kernel_chain_extract_secret(&envelope, &kernel_keypair)?;
+	let holder_secret = crate::envelope::escrow_extract_secret(&envelope, &escrow_keypair)?;
 
 	// Tamper with ciphertext
 	if let Some(byte) = envelope.ciphertext.get_mut(0) {
 		*byte ^= 0xFF;
 	}
 
-	let result = crate::envelope::kernel_chain_decapsulate(&envelope, &recipient_keypair, &kernel_secret);
+	let result = crate::envelope::escrow_decapsulate(&envelope, &recipient_keypair, &holder_secret);
 
 	// -- Check
 	assert!(result.is_err(), "Tampered ciphertext should fail authentication");
@@ -608,27 +606,26 @@ fn test_envelope_kernel_chain_tampered_ciphertext_fails() -> Result<()> {
 }
 
 #[test]
-fn test_envelope_kernel_chain_tampered_mlkem_recipient_ct_fails() -> Result<()> {
+fn test_envelope_escrow_tampered_mlkem_recipient_ct_fails() -> Result<()> {
 	// Property: Tampered ML-KEM recipient ciphertext should fail
 
 	// -- Setup & Fixtures
 	let mut rng = TemperEntropy::from_seed([0x84; 32]);
 	let recipient_keypair = generate_envelope_keypair(&mut rng)?;
-	let kernel_keypair = generate_envelope_keypair(&mut rng)?;
+	let escrow_keypair = generate_envelope_keypair(&mut rng)?;
 	let plaintext = b"Secret message";
 
 	// -- Exec
-	let mut envelope =
-		crate::envelope::kernel_chain_encapsulate(&mut rng, plaintext, &recipient_keypair, &kernel_keypair)?;
+	let mut envelope = crate::envelope::escrow_encapsulate(&mut rng, plaintext, &recipient_keypair, &escrow_keypair)?;
 
-	let kernel_secret = crate::envelope::kernel_chain_extract_secret(&envelope, &kernel_keypair)?;
+	let holder_secret = crate::envelope::escrow_extract_secret(&envelope, &escrow_keypair)?;
 
 	// Tamper with ML-KEM recipient ciphertext
 	if let Some(byte) = envelope.mlkem_ct_recipient.get_mut(0) {
 		*byte ^= 0xFF;
 	}
 
-	let result = crate::envelope::kernel_chain_decapsulate(&envelope, &recipient_keypair, &kernel_secret);
+	let result = crate::envelope::escrow_decapsulate(&envelope, &recipient_keypair, &holder_secret);
 
 	// -- Check
 	assert!(result.is_err(), "Tampered ML-KEM recipient ciphertext should fail");
@@ -636,57 +633,55 @@ fn test_envelope_kernel_chain_tampered_mlkem_recipient_ct_fails() -> Result<()> 
 }
 
 #[test]
-fn test_envelope_kernel_chain_tampered_mlkem_kernel_ct_fails() -> Result<()> {
-	// Property: Tampered ML-KEM kernel ciphertext should cause decryption to fail
+fn test_envelope_escrow_tampered_mlkem_holder_ct_fails() -> Result<()> {
+	// Property: Tampered ML-KEM holder ciphertext should cause decryption to fail
 	// Note: ML-KEM decapsulation may succeed with tampered CT but produces wrong shared secret,
 	// which causes the final ChaCha20-Poly1305 decryption to fail
 
 	// -- Setup & Fixtures
 	let mut rng = TemperEntropy::from_seed([0x85; 32]);
 	let recipient_keypair = generate_envelope_keypair(&mut rng)?;
-	let kernel_keypair = generate_envelope_keypair(&mut rng)?;
+	let escrow_keypair = generate_envelope_keypair(&mut rng)?;
 	let plaintext = b"Secret message";
 
 	// -- Exec
-	let mut envelope =
-		crate::envelope::kernel_chain_encapsulate(&mut rng, plaintext, &recipient_keypair, &kernel_keypair)?;
+	let mut envelope = crate::envelope::escrow_encapsulate(&mut rng, plaintext, &recipient_keypair, &escrow_keypair)?;
 
-	// Tamper with ML-KEM kernel ciphertext
-	if let Some(byte) = envelope.mlkem_ct_kernel.get_mut(0) {
+	// Tamper with ML-KEM holder ciphertext
+	if let Some(byte) = envelope.mlkem_ct_escrow.get_mut(0) {
 		*byte ^= 0xFF;
 	}
 
-	// Extract kernel secret - may succeed with wrong value
-	let kernel_secret = crate::envelope::kernel_chain_extract_secret(&envelope, &kernel_keypair)?;
+	// Extract holder secret - may succeed with wrong value
+	let holder_secret = crate::envelope::escrow_extract_secret(&envelope, &escrow_keypair)?;
 
 	// Try to decapsulate - should fail due to wrong shared secret
-	let result = crate::envelope::kernel_chain_decapsulate(&envelope, &recipient_keypair, &kernel_secret);
+	let result = crate::envelope::escrow_decapsulate(&envelope, &recipient_keypair, &holder_secret);
 
 	// -- Check
 	assert!(
 		result.is_err(),
-		"Decapsulation with tampered kernel ciphertext should fail authentication"
+		"Decapsulation with tampered holder ciphertext should fail authentication"
 	);
 	Ok(())
 }
 
 #[test]
-fn test_envelope_kernel_chain_large_plaintext() -> Result<()> {
+fn test_envelope_escrow_large_plaintext() -> Result<()> {
 	// Property: Should handle large plaintext (> 1 MB)
 
 	// -- Setup & Fixtures
 	let mut rng = TemperEntropy::from_seed([0x86; 32]);
 	let recipient_keypair = generate_envelope_keypair(&mut rng)?;
-	let kernel_keypair = generate_envelope_keypair(&mut rng)?;
+	let escrow_keypair = generate_envelope_keypair(&mut rng)?;
 	let plaintext = vec![0x42u8; 1024 * 1024]; // 1 MB
 
 	// -- Exec
-	let envelope =
-		crate::envelope::kernel_chain_encapsulate(&mut rng, &plaintext, &recipient_keypair, &kernel_keypair)?;
+	let envelope = crate::envelope::escrow_encapsulate(&mut rng, &plaintext, &recipient_keypair, &escrow_keypair)?;
 
-	let kernel_secret = crate::envelope::kernel_chain_extract_secret(&envelope, &kernel_keypair)?;
+	let holder_secret = crate::envelope::escrow_extract_secret(&envelope, &escrow_keypair)?;
 
-	let recovered = crate::envelope::kernel_chain_decapsulate(&envelope, &recipient_keypair, &kernel_secret)?;
+	let recovered = crate::envelope::escrow_decapsulate(&envelope, &recipient_keypair, &holder_secret)?;
 
 	// -- Check
 	assert_eq!(
@@ -699,23 +694,21 @@ fn test_envelope_kernel_chain_large_plaintext() -> Result<()> {
 }
 
 #[test]
-fn test_envelope_kernel_chain_deterministic_with_same_seed() -> Result<()> {
+fn test_envelope_escrow_deterministic_with_same_seed() -> Result<()> {
 	// Property: Same RNG seed should produce same envelope
 
 	// -- Setup & Fixtures
 	let mut rng = TemperEntropy::from_seed([0x87; 32]);
 	let recipient_keypair = generate_envelope_keypair(&mut rng)?;
-	let kernel_keypair = generate_envelope_keypair(&mut rng)?;
+	let escrow_keypair = generate_envelope_keypair(&mut rng)?;
 	let plaintext = b"Test determinism";
 
 	// -- Exec
 	let mut rng1 = TemperEntropy::from_seed([0x88; 32]);
-	let envelope1 =
-		crate::envelope::kernel_chain_encapsulate(&mut rng1, plaintext, &recipient_keypair, &kernel_keypair)?;
+	let envelope1 = crate::envelope::escrow_encapsulate(&mut rng1, plaintext, &recipient_keypair, &escrow_keypair)?;
 
 	let mut rng2 = TemperEntropy::from_seed([0x88; 32]); // Same seed
-	let envelope2 =
-		crate::envelope::kernel_chain_encapsulate(&mut rng2, plaintext, &recipient_keypair, &kernel_keypair)?;
+	let envelope2 = crate::envelope::escrow_encapsulate(&mut rng2, plaintext, &recipient_keypair, &escrow_keypair)?;
 
 	// -- Check
 	assert_eq!(
@@ -727,64 +720,60 @@ fn test_envelope_kernel_chain_deterministic_with_same_seed() -> Result<()> {
 		"ML-KEM recipient ciphertexts should be deterministic"
 	);
 	assert_eq!(
-		envelope1.mlkem_ct_kernel, envelope2.mlkem_ct_kernel,
-		"ML-KEM kernel ciphertexts should be deterministic"
+		envelope1.mlkem_ct_escrow, envelope2.mlkem_ct_escrow,
+		"ML-KEM holder ciphertexts should be deterministic"
 	);
 	Ok(())
 }
 
 #[test]
-fn test_envelope_kernel_chain_different_kernel_keys_change_ciphertext() -> Result<()> {
-	// Property: Different kernel keys should produce different ciphertexts
+fn test_envelope_escrow_different_holder_keys_change_ciphertext() -> Result<()> {
+	// Property: Different holder keys should produce different ciphertexts
 
 	// -- Setup & Fixtures
 	let mut rng = TemperEntropy::from_seed([0x89; 32]);
 	let recipient_keypair = generate_envelope_keypair(&mut rng)?;
-	let kernel_keypair1 = generate_envelope_keypair(&mut rng)?;
-	let kernel_keypair2 = generate_envelope_keypair(&mut rng)?;
+	let escrow_keypair1 = generate_envelope_keypair(&mut rng)?;
+	let escrow_keypair2 = generate_envelope_keypair(&mut rng)?;
 	let plaintext = b"Same plaintext";
 
 	// -- Exec
 	let mut rng1 = TemperEntropy::from_seed([0x90; 32]);
-	let envelope1 =
-		crate::envelope::kernel_chain_encapsulate(&mut rng1, plaintext, &recipient_keypair, &kernel_keypair1)?;
+	let envelope1 = crate::envelope::escrow_encapsulate(&mut rng1, plaintext, &recipient_keypair, &escrow_keypair1)?;
 
 	let mut rng2 = TemperEntropy::from_seed([0x90; 32]); // Same seed
-	let envelope2 =
-		crate::envelope::kernel_chain_encapsulate(&mut rng2, plaintext, &recipient_keypair, &kernel_keypair2)?;
+	let envelope2 = crate::envelope::escrow_encapsulate(&mut rng2, plaintext, &recipient_keypair, &escrow_keypair2)?;
 
 	// -- Check
 	assert_ne!(
 		envelope1.envelope_id, envelope2.envelope_id,
-		"Different kernel keys should produce different envelope IDs"
+		"Different holder keys should produce different envelope IDs"
 	);
 	assert_ne!(
-		envelope1.mlkem_ct_kernel, envelope2.mlkem_ct_kernel,
-		"Different kernel keys should produce different ML-KEM kernel ciphertexts"
+		envelope1.mlkem_ct_escrow, envelope2.mlkem_ct_escrow,
+		"Different holder keys should produce different ML-KEM holder ciphertexts"
 	);
 	// Ciphertext should also differ due to different derived keys
 	assert_ne!(
 		envelope1.ciphertext, envelope2.ciphertext,
-		"Different kernel keys should produce different ciphertexts"
+		"Different holder keys should produce different ciphertexts"
 	);
 	Ok(())
 }
 
 #[test]
-fn test_envelope_kernel_chain_envelope_id_uniqueness() -> Result<()> {
+fn test_envelope_escrow_envelope_id_uniqueness() -> Result<()> {
 	// Property: Different messages should produce different envelope IDs
 
 	// -- Setup & Fixtures
 	let mut rng = TemperEntropy::from_seed([0x91; 32]);
 	let recipient_keypair = generate_envelope_keypair(&mut rng)?;
-	let kernel_keypair = generate_envelope_keypair(&mut rng)?;
+	let escrow_keypair = generate_envelope_keypair(&mut rng)?;
 
 	// -- Exec
-	let envelope1 =
-		crate::envelope::kernel_chain_encapsulate(&mut rng, b"Message 1", &recipient_keypair, &kernel_keypair)?;
+	let envelope1 = crate::envelope::escrow_encapsulate(&mut rng, b"Message 1", &recipient_keypair, &escrow_keypair)?;
 
-	let envelope2 =
-		crate::envelope::kernel_chain_encapsulate(&mut rng, b"Message 2", &recipient_keypair, &kernel_keypair)?;
+	let envelope2 = crate::envelope::escrow_encapsulate(&mut rng, b"Message 2", &recipient_keypair, &escrow_keypair)?;
 
 	// -- Check
 	assert_ne!(
@@ -795,20 +784,20 @@ fn test_envelope_kernel_chain_envelope_id_uniqueness() -> Result<()> {
 }
 
 #[test]
-fn test_envelope_kernel_chain_serde_roundtrip() -> Result<()> {
+fn test_envelope_escrow_serde_roundtrip() -> Result<()> {
 	// Property: Serialize and deserialize should preserve envelope
 
 	// -- Setup & Fixtures
 	let mut rng = TemperEntropy::from_seed([0x92; 32]);
 	let recipient_keypair = generate_envelope_keypair(&mut rng)?;
-	let kernel_keypair = generate_envelope_keypair(&mut rng)?;
+	let escrow_keypair = generate_envelope_keypair(&mut rng)?;
 	let plaintext = b"Test serialization";
 
-	let envelope = crate::envelope::kernel_chain_encapsulate(&mut rng, plaintext, &recipient_keypair, &kernel_keypair)?;
+	let envelope = crate::envelope::escrow_encapsulate(&mut rng, plaintext, &recipient_keypair, &escrow_keypair)?;
 
 	// -- Exec
 	let serialized = postcard::to_allocvec(&envelope).map_err(|e| Error::Serialization(e.to_string()))?;
-	let deserialized: crate::envelope::KernelChainEnvelope =
+	let deserialized: crate::envelope::EscrowEnvelope =
 		postcard::from_bytes(&serialized).map_err(|e| Error::Serialization(e.to_string()))?;
 
 	// -- Check
@@ -821,36 +810,36 @@ fn test_envelope_kernel_chain_serde_roundtrip() -> Result<()> {
 		"ML-KEM recipient ciphertexts should match"
 	);
 	assert_eq!(
-		envelope.mlkem_ct_kernel, deserialized.mlkem_ct_kernel,
-		"ML-KEM kernel ciphertexts should match"
+		envelope.mlkem_ct_escrow, deserialized.mlkem_ct_escrow,
+		"ML-KEM holder ciphertexts should match"
 	);
 	assert_eq!(envelope.ciphertext, deserialized.ciphertext, "Ciphertexts should match");
 
 	// Verify decapsulation still works
-	let kernel_secret = crate::envelope::kernel_chain_extract_secret(&deserialized, &kernel_keypair)?;
+	let holder_secret = crate::envelope::escrow_extract_secret(&deserialized, &escrow_keypair)?;
 
-	let recovered = crate::envelope::kernel_chain_decapsulate(&deserialized, &recipient_keypair, &kernel_secret)?;
+	let recovered = crate::envelope::escrow_decapsulate(&deserialized, &recipient_keypair, &holder_secret)?;
 
 	assert_eq!(plaintext, recovered.as_slice());
 	Ok(())
 }
 
 #[test]
-fn test_envelope_kernel_chain_empty_plaintext() -> Result<()> {
+fn test_envelope_escrow_empty_plaintext() -> Result<()> {
 	// Property: Should handle empty plaintext
 
 	// -- Setup & Fixtures
 	let mut rng = TemperEntropy::from_seed([0x93; 32]);
 	let recipient_keypair = generate_envelope_keypair(&mut rng)?;
-	let kernel_keypair = generate_envelope_keypair(&mut rng)?;
+	let escrow_keypair = generate_envelope_keypair(&mut rng)?;
 	let plaintext = b"";
 
 	// -- Exec
-	let envelope = crate::envelope::kernel_chain_encapsulate(&mut rng, plaintext, &recipient_keypair, &kernel_keypair)?;
+	let envelope = crate::envelope::escrow_encapsulate(&mut rng, plaintext, &recipient_keypair, &escrow_keypair)?;
 
-	let kernel_secret = crate::envelope::kernel_chain_extract_secret(&envelope, &kernel_keypair)?;
+	let holder_secret = crate::envelope::escrow_extract_secret(&envelope, &escrow_keypair)?;
 
-	let recovered = crate::envelope::kernel_chain_decapsulate(&envelope, &recipient_keypair, &kernel_secret)?;
+	let recovered = crate::envelope::escrow_decapsulate(&envelope, &recipient_keypair, &holder_secret)?;
 
 	// -- Check
 	assert_eq!(
@@ -862,6 +851,6 @@ fn test_envelope_kernel_chain_empty_plaintext() -> Result<()> {
 	Ok(())
 }
 
-// endregion: --- Kernel Chain Envelope Tests
+// endregion: --- Escrow Envelope Tests
 
 // endregion: --- Unit Tests

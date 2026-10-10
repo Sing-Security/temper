@@ -1,5 +1,5 @@
 #![no_std]
-#![doc = "Temper — Quantum-safe cryptographic protocol with hardened entropy and dual PQC signatures."]
+#![doc = "Temper - Quantum-safe cryptographic protocol with hardened entropy and dual PQC signatures."]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -87,8 +87,8 @@ mod stubs;
 mod getrandom_custom;
 
 // The statistical suites report their results, which only means something with
-// a stdout. Under no_std these expand to a no-op so the assertions — the part
-// that can actually fail — still run. Declared before the modules below, since
+// a stdout. Under no_std these expand to a no-op so the assertions - the part
+// that can actually fail - still run. Declared before the modules below, since
 // `macro_rules!` scoping is textual.
 #[cfg(all(test, not(feature = "std")))]
 macro_rules! println {
@@ -164,13 +164,13 @@ pub use hardware_example::HardwareTrng;
 #[cfg(feature = "envelope")]
 pub use envelope::{ConcealmentKeypair, ConcealmentPublicKey};
 #[cfg(feature = "envelope")]
-pub use envelope::{Envelope, EnvelopeKeypair, KernelChainEnvelope};
+pub use envelope::{Envelope, EnvelopeKeypair, EscrowEnvelope};
 #[cfg(feature = "envelope")]
 pub use envelope::{authenticated_decapsulate, authenticated_encapsulate};
 #[cfg(feature = "envelope")]
 pub use envelope::{decapsulate, encapsulate, generate_envelope_keypair};
 #[cfg(feature = "envelope")]
-pub use envelope::{kernel_chain_decapsulate, kernel_chain_encapsulate, kernel_chain_extract_secret};
+pub use envelope::{escrow_decapsulate, escrow_encapsulate, escrow_extract_secret};
 
 #[cfg(feature = "session")]
 pub use record::RecordKeys;
@@ -189,15 +189,15 @@ pub use session_cookie::SessionCookie;
 
 // Stub types for when envelope feature is disabled
 #[cfg(not(feature = "envelope"))]
-pub use stubs::{Envelope, EnvelopeKeypair, KernelChainEnvelope};
+pub use stubs::{Envelope, EnvelopeKeypair, EscrowEnvelope};
 #[cfg(all(not(feature = "envelope"), feature = "alloc"))]
 pub use stubs::{
-	authenticated_decapsulate, authenticated_encapsulate, decapsulate, encapsulate, generate_envelope_keypair,
-	kernel_chain_decapsulate, kernel_chain_encapsulate, kernel_chain_extract_secret,
+	authenticated_decapsulate, authenticated_encapsulate, decapsulate, encapsulate, escrow_decapsulate,
+	escrow_encapsulate, escrow_extract_secret, generate_envelope_keypair,
 };
 
 // `encrypt` / `decrypt` used to live here as public no-ops returning their input
-// unchanged. Removed 2026-10-08 — a crypto crate must not export a function
+// unchanged. Removed 2026-10-08 - a crypto crate must not export a function
 // named `encrypt` that hands back plaintext. Use the envelope API.
 
 // endregion: --- Modules
