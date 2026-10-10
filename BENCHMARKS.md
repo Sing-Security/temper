@@ -47,7 +47,7 @@ ChaCha20-Poly1305 under the counter-nonce discipline, single core:
 
 ~0.85 GiB/s per core is the tunnel ceiling; it is the expected ChaCha class
 for portable Rust (no hardware AEAD), well below AES-NI TLS but with no
-instruction-set requirement - the same code runs on an ARM crucible.
+instruction-set requirement - the same code runs on an ARM host.
 
 ## BLAKE3 (vendored, 2026-10)
 

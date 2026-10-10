@@ -3,7 +3,7 @@
 # project. The library target below keeps the name `temper`, so the rename
 # never leaks past the manifest.
 name = "temper-rs"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2024"
 rust-version = "1.89"
 description = "Temper - Quantum-safe cryptographic protocol with hardened entropy and dual PQC signatures. Fully no_std for embedded."
@@ -48,11 +48,12 @@ session = ["envelope"]
 # Hardware entropy example (optional, no_std compatible)
 hardware_example = []
 
-# CrucibleOS userspace entropy: route getrandom to the kernel CSPRNG via the
-# GetRandom (80) syscall. ONLY for userspace CBLs - never enable in the kernel
-# (it emits a ring-3 `syscall`/`svc` instruction). Without this, no_std builds
-# fall back to the zero-fill getrandom stub (deterministic DRBG seeds).
-crucible-user-getrandom = []
+# Userspace entropy: route getrandom to the host kernel's CSPRNG via the
+# GetRandom (80) syscall. ONLY for userspace builds - never enable where the
+# crate is linked into ring 0 (it emits a ring-3 `syscall`/`svc` instruction).
+# Without this, no_std builds fall back to the zero-fill getrandom stub
+# (deterministic DRBG seeds).
+host-getrandom = []
 
 # Network transport (std only): length-prefixed framing ([u32 LE length]
 # [postcard payload]) over tokio's LengthDelimitedCodec, plus a tokio
@@ -141,7 +142,7 @@ required-features = ["std", "envelope"]
 # Referenced by README/CHANGELOG/BINARY_SIZE_GUIDE but never declared, so the
 # documented `--profile release-server` command failed. Only applies when Temper
 # is built standalone; Cargo reads profiles from the workspace root only, so
-# these are ignored inside the CrucibleOS workspace.
+# these are ignored inside a parent workspace.
 
 [profile.release]
 opt-level = "s"

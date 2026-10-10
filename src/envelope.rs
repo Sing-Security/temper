@@ -204,17 +204,18 @@ pub struct Envelope {
 /// escrow holder's share must be delivered alongside the ciphertext for
 /// anyone to decrypt.
 ///
-/// The motivating deployment is an OS kernel mediating message passing
-/// (CrucibleOS): the kernel extracts its share per message and hands it to
-/// the recipient at delivery, so admission control and per-message
-/// attestation stay possible without the kernel holding a master key. The
-/// same shape fits any transport where a third party is already in the
-/// message path - a mail proxy, a broker, a break-glass auditor - and must
-/// stay there cryptographically rather than by policy.
+/// The motivating deployment is a mediator already sitting in the message
+/// path - for example an OS kernel brokering message passing: it extracts
+/// its share per message and hands it to the recipient at delivery, so
+/// admission control and per-message attestation stay possible without the
+/// mediator holding a master key. The same shape fits any transport where a
+/// third party is already in the path - a mail proxy, a broker, a
+/// break-glass auditor - and must stay there cryptographically rather than
+/// by policy.
 ///
 /// NO seals involved. Authentication comes from the transport binding the
-/// sender's identity (in CrucibleOS the kernel sets `sender: ProcessId`,
-/// which is unforgeable), not from a signature on the envelope.
+/// sender's identity - the mediator stamps it at admission and the recipient
+/// trusts the path it arrived on - not from a signature on the envelope.
 ///
 /// Cost: ~0.3 ms per message (vs. ~36 ms with seals)
 ///
@@ -229,9 +230,9 @@ pub struct Envelope {
 ///
 /// ## Share extraction (escrow holder side)
 /// 1. `mlkem_ss_E = ML-KEM.Decap(escrow_sk, mlkem_ct_E)` - the escrow holder's portion
-/// 2. The holder passes `mlkem_ss_E` to the recipient out of band; in
-///    CrucibleOS the kernel stores it in the process table and delivers it
-///    with the message on IPC_RECV.
+/// 2. The holder passes `mlkem_ss_E` to the recipient out of band; a
+///    mediating kernel stores it in the recipient's process state and
+///    delivers it with the message.
 /// 3. The holder alone cannot derive `channel_key` (it holds neither
 ///    `mlkem_ss_R` nor `x25519_ss`), so it can attest that a message
 ///    passed through but cannot read it.

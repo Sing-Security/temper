@@ -170,7 +170,7 @@ impl TemperEntropy {
 	/// custom handler (zero-fill stub - callers should prefer `from_sources` there).
 	///
 	/// This constructor allows code that uses `alloc` but not `std` (e.g. userspace
-	/// crucibles compiled with `default-features = false, features = ["alloc", …]`)
+	/// no_std crates compiled with `default-features = false, features = ["alloc", …]`)
 	/// to create a `TemperEntropy` without providing explicit entropy sources.
 	#[cfg(all(feature = "alloc", not(feature = "std")))]
 	pub fn new() -> Result<Self> {

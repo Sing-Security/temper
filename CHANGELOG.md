@@ -8,6 +8,33 @@ Versions before 0.5.0 were internal and were never published. Their entries are 
 below for lineage; treat them as history, not as release notes for anything you can
 depend on.
 
+## [0.7.0] - 2026-10-10
+
+The de-branding release: nothing here changes the crypto, but two names were
+load-bearing and both move.
+
+### Changed - Breaking
+
+- **Renamed the `crucible-user-getrandom` feature to `host-getrandom`.** Same
+  behavior - routes `getrandom` to the host kernel's CSPRNG instead of the
+  zero-fill bare-metal fallback. The old name described one consumer rather
+  than the feature's actual contract. Migration: rename the feature in your
+  `Cargo.toml`.
+- **`keychain` domain strings renamed to `Temper.*`.** `CrucibleOS.CapKey.v1` /
+  `OpToken.v1` / `DelegationKey.v1` became `Temper.CapKey.v1` /
+  `Temper.OpToken.v1` / `Temper.DelegationKey.v1`. The domains are fixed
+  cryptographic separators, so keys derived by 0.6.0 do not match keys derived
+  by 0.7.0 from the same root. Migration: re-derive, or pin 0.6.0 if your
+  derived keys are persisted anywhere. The domains live only in memory inside
+  this crate; nothing on any wire format carries them.
+
+### Changed
+
+- Documentation pass: source docs and examples no longer assume one operating
+  system or one consumer. The escrow envelope's docs describe the general
+  three-party shape; the OS-kernel-mediating-messages deployment remains the
+  motivating example.
+
 ## [0.6.0] - 2026-10-09
 
 ### Changed

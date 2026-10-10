@@ -142,7 +142,7 @@ assert!(result.is_valid());
 - **`blake3_simd`** *(std only)* - BLAKE3 SIMD intrinsics (NEON, SSE2, AVX2, AVX-512).
 - **`blake3_parallel`** *(std only)* - Rayon-based parallel hashing for content ≥ 1 MiB.
   Implies `blake3_simd`.
-- **`crucible-user-getrandom`** - host-platform entropy hook. See below.
+- **`host-getrandom`** - host entropy hook. See below.
 
 With `signatures` disabled, the seal API compiles to stubs so that downstream code
 still builds: `verify_seal` returns `Ok(valid: true)` unconditionally. **Do not rely
@@ -153,10 +153,12 @@ and is implied by `envelope`.
 
 Two features exist for a specific host, not as general-purpose API.
 
-**`crucible-user-getrandom`** routes `getrandom` to a host syscall instead of the
-zero-fill fallback used on bare metal. Without it, a `no_std` build that calls
-`TemperEntropy::new()` seeds its DRBG deterministically, which silently produces
-predictable keys. Enable it on any `no_std` target that has an OS underneath it.
+**`host-getrandom`** routes `getrandom` to the host kernel's CSPRNG via a syscall
+instead of the zero-fill fallback used on bare metal. Without it, a `no_std` build
+that calls `TemperEntropy::new()` seeds its DRBG deterministically, which silently
+produces predictable keys. Enable it on any `no_std` target that has an OS
+underneath it - never where the crate is linked into the kernel itself, because
+the hook issues a userspace syscall instruction.
 
 **`keychain`** provides a derived-key hierarchy seeded from a process root key. Its
 BLAKE3 domain strings are fixed cryptographic separators - changing them would change

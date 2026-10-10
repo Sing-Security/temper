@@ -1,11 +1,11 @@
 // region:    --- CapKeychain
 
-//! Cryptographic capability key hierarchy for CrucibleOS.
+//! Cryptographic capability key hierarchy.
 //!
 //! # Overview
 //!
 //! Every process seeds a [`CapKeychain`] from its one-time process root key
-//! (obtained via `libcrucible_syscall::process_get_root_key`).  All derived
+//! (supplied by the host environment at process start).  All derived
 //! keys use BLAKE3 KDF with named domains so derivations are one-way and
 //! domain-separated.
 //!
@@ -13,9 +13,9 @@
 //!
 //! | Domain | Purpose |
 //! |--------|---------|
-//! | `"CrucibleOS.CapKey.v1"` | Per-capability subkey |
-//! | `"CrucibleOS.OpToken.v1"` | Per-opcode operation token |
-//! | `"CrucibleOS.DelegationKey.v1"` | Delegation proof MAC key |
+//! | `"Temper.CapKey.v1"` | Per-capability subkey |
+//! | `"Temper.OpToken.v1"` | Per-opcode operation token |
+//! | `"Temper.DelegationKey.v1"` | Delegation proof MAC key |
 
 use zerocopy::{Immutable, IntoBytes};
 
@@ -36,14 +36,14 @@ impl CapKeychain {
 
 	/// Derive a capability-scoped subkey for `(cap_id, permissions)`.
 	///
-	/// Domain: `"CrucibleOS.CapKey.v1"`
+	/// Domain: `"Temper.CapKey.v1"`
 	/// Material: `root_key || cap_id (4 bytes LE) || permissions (4 bytes LE)`
 	pub fn cap_key(&self, cap_id: u32, permissions: u32) -> [u8; 32] {
 		let mut m = [0u8; 40];
 		m[..32].copy_from_slice(&self.root_key);
 		m[32..36].copy_from_slice(&cap_id.to_le_bytes());
 		m[36..40].copy_from_slice(&permissions.to_le_bytes());
-		blake3::derive_key("CrucibleOS.CapKey.v1", &m)
+		blake3::derive_key("Temper.CapKey.v1", &m)
 	}
 
 	/// Derive an operation token for a specific `(service_id, opcode)` pair.
@@ -51,7 +51,7 @@ impl CapKeychain {
 	/// The token proves the holder is permitted to invoke `opcode` on
 	/// `service_id` using the given capability.
 	///
-	/// Domain: `"CrucibleOS.OpToken.v1"`
+	/// Domain: `"Temper.OpToken.v1"`
 	/// Material: `cap_key || service_id (2 bytes LE) || opcode (4 bytes LE)`
 	pub fn op_token(&self, cap_id: u32, permissions: u32, service_id: u16, opcode: u32) -> [u8; 32] {
 		let cap_k = self.cap_key(cap_id, permissions);
@@ -59,12 +59,12 @@ impl CapKeychain {
 		m[..32].copy_from_slice(&cap_k);
 		m[32..34].copy_from_slice(&service_id.to_le_bytes());
 		m[34..38].copy_from_slice(&opcode.to_le_bytes());
-		blake3::derive_key("CrucibleOS.OpToken.v1", &m)
+		blake3::derive_key("Temper.OpToken.v1", &m)
 	}
 
 	/// Derive a delegation MAC key for granting a scoped sub-capability.
 	///
-	/// Domain: `"CrucibleOS.DelegationKey.v1"`
+	/// Domain: `"Temper.DelegationKey.v1"`
 	/// Material: `cap_key || grantee_pid (4 bytes LE) || delegated_perms (4 bytes LE)`
 	pub fn delegation_key(&self, cap_id: u32, permissions: u32, grantee_pid: u32, delegated_perms: u32) -> [u8; 32] {
 		let cap_k = self.cap_key(cap_id, permissions);
@@ -72,7 +72,7 @@ impl CapKeychain {
 		m[..32].copy_from_slice(&cap_k);
 		m[32..36].copy_from_slice(&grantee_pid.to_le_bytes());
 		m[36..40].copy_from_slice(&delegated_perms.to_le_bytes());
-		blake3::derive_key("CrucibleOS.DelegationKey.v1", &m)
+		blake3::derive_key("Temper.DelegationKey.v1", &m)
 	}
 }
 
@@ -297,7 +297,9 @@ mod tests {
 	/// Captured from the hand-written `signed_bytes` before the zerocopy
 	/// rewrite (2026-10-08); values are LE bytes of the fixed fixture below.
 	const GOLDEN_SIGNED_HEX: &str = "efbeadde887766554433221103000000cdab000000000000efcdab8967452301";
-	const GOLDEN_MAC_HEX: &str = "06aa8839346570377b956eaa36292333dfba55e01c49cc4df9010ba8ffb60d13";
+	// Captured under the `Temper.*` domains (0.7.0); the delegation MAC covers
+	// CapKey- and DelegationKey-domain subkeys, so the domain rename moved it.
+	const GOLDEN_MAC_HEX: &str = "676dfd159f474e74feafb1daefb06e2ce6d8cb75e92b8ea52ca852686dfac415";
 
 	fn fixture_token() -> (CapKeychain, DelegationToken) {
 		let keychain = CapKeychain::from_root([0x42; 32]);

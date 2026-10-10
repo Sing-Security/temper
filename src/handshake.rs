@@ -2,12 +2,11 @@
 //!
 //! Two-party ephemeral handshake using ML-KEM-1024 + X25519, producing a
 //! shared 32-byte session key both sides derive independently. This is the
-//! same protocol shape as `temper-cbl`'s cross-node `session.rs` (that one
-//! stays as-is - it registers keys with the kernel session table and is
-//! wired into IPC), generalized here so any `envelope`-feature consumer of
-//! this crate can reuse the exact same reviewed KEM/DH/KDF logic without
-//! re-deriving it - notably a browser-side WASM client, which cannot depend
-//! on a CrucibleOS kernel-target crate like `temper-cbl` at all.
+//! same KEM/DH/KDF shape as the OS-integrated session paths it grew out of,
+//! generalized here so any `envelope`-feature consumer of this crate can
+//! reuse the exact same reviewed logic without re-deriving it - notably a
+//! browser-side WASM client, which cannot link an OS-integrated transport
+//! at all.
 //!
 //! # Protocol
 //!

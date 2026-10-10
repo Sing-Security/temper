@@ -1,5 +1,5 @@
-# Matches the CrucibleOS root config, where Temper is developed as a path
-# dependency. Without it, `cargo fmt --check` flags every file in the tree.
+# Matches the root config of the workspace Temper is developed in. Without
+# it, `cargo fmt --check` flags every file in the tree.
 
 hard_tabs = true
 edition = "2024"

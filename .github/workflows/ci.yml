@@ -1,7 +1,7 @@
 # .github/workflows/ci.yml
 #
-# Temper is developed as a path dependency inside the CrucibleOS workspace, which
-# patches blake3/ml-dsa/sha2 and friends to in-tree vendored crates via
+# Temper is developed as a path dependency inside a larger workspace, which
+# patches blake3/ml-dsa/sha2 and friends to vendored crates via
 # [patch.crates-io]. That means an in-tree build never proves the crate is
 # publishable: it can compile against replacements that no external consumer has.
 # These jobs build against stock crates.io, which is the only thing an in-tree
@@ -39,7 +39,7 @@ jobs:
           - { name: keychain,       flags: "--no-default-features --features alloc,keychain" }
           - { name: hardware,       flags: "--no-default-features --features alloc,hardware_example" }
           - { name: compression,    flags: "--no-default-features --features alloc,signatures,compression" }
-          - { name: user-getrandom, flags: "--no-default-features --features alloc,crucible-user-getrandom" }
+          - { name: host-getrandom, flags: "--no-default-features --features alloc,host-getrandom" }
           - { name: blake3-simd,    flags: "--no-default-features --features blake3_simd" }
           - { name: blake3-parallel,flags: "--no-default-features --features blake3_parallel" }
           - { name: transport,      flags: "--no-default-features --features transport" }

@@ -34,7 +34,7 @@ These limitations are deliberate and documented, not vulnerabilities:
   on both sides, mandatory client authentication. Its residual risks (handshake
   replay, cleartext identities, no rekey, caller-side certificate-expiry checks)
   are listed in [`PROTOCOL.md`](PROTOCOL.md); read that list before deploying it.
-- **`keychain` and the `crucible-user-getrandom` feature are host-platform
+- **`keychain` and the `host-getrandom` feature are host-platform
   integration**, not general-purpose API. Their BLAKE3 domain strings are
   cryptographic separators bound to an existing deployment; changing them would
   change every derived key. See the README.

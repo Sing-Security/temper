@@ -2,7 +2,7 @@
 //! flights (whole and one-by-one, so the cost profile is readable), the
 //! record layer at the sizes a tunnel actually carries, and raw BLAKE3 as
 //! the reference point both are built on. The document-signing path is
-//! seal_bench.rs; this file is the wire protocol birdhub runs.
+//! seal_bench.rs; this file is the session wire protocol as carried.
 //!
 //! Run with: cargo bench --bench session_bench --features session
 

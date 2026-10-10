@@ -4,19 +4,19 @@
 //! complementary), and `register_custom_getrandom!` wires whichever one that
 //! is into `getrandom`.
 
-/// Custom getrandom for CrucibleOS *userspace* builds (no_std CBLs).
+/// Custom getrandom for no_std userspace builds.
 ///
-/// Fills the buffer from the kernel CSPRNG via the `GetRandom` (80) syscall -
-/// the same source `std`'s PAL uses. Without this, no_std CBLs fell through
-/// to the zero-fill stub below, which made `TemperEntropy::new()` (the
-/// alloc-only constructor) seed its DRBG deterministically - every temper-cbl
-/// service keypair was derived from an all-zero seed.
+/// Fills the buffer from the host kernel's CSPRNG via the `GetRandom` (80)
+/// syscall - the same source `std`'s PAL uses. Without this, no_std builds
+/// fell through to the zero-fill stub below, which made `TemperEntropy::new()`
+/// (the alloc-only constructor) seed its DRBG deterministically - every
+/// keypair a no_std consumer made was derived from an all-zero seed.
 ///
-/// Gated behind an explicit feature (NOT `target_os = "crucible"`) because the
-/// kernel itself also links this crate with the same `target_os` - executing a
-/// ring-3 `syscall`/`svc` instruction in ring 0 / EL1 must be impossible by
-/// construction, so only userspace crates may enable `crucible-user-getrandom`.
-#[cfg(all(not(feature = "std"), feature = "crucible-user-getrandom"))]
+/// Gated behind an explicit feature rather than a `target_os` because a build
+/// that runs in ring 0 links this same crate, and executing a ring-3
+/// `syscall`/`svc` instruction there must be impossible by construction: only
+/// userspace crates may enable `host-getrandom`.
+#[cfg(all(not(feature = "std"), feature = "host-getrandom"))]
 // `unsafe_code = "deny"` (Cargo.toml): the GetRandom syscall cannot be issued
 // from safe Rust, and this is the crate's only irreducible `unsafe` once
 // `DelegationToken::signed_bytes` moves to `zerocopy`.
@@ -80,9 +80,9 @@ fn custom_getrandom(buf: &mut [u8]) -> core::result::Result<(), getrandom::Error
 /// 1. The target has no OS to provide entropy
 /// 2. The caller provides custom entropy sources via `TemperEntropy::from_sources()`
 ///
-/// Userspace CBLs must enable the `crucible-user-getrandom` feature instead
+/// no_std userspace crates must enable the `host-getrandom` feature instead
 /// (see above) so they get real kernel entropy.
-#[cfg(all(not(feature = "std"), not(feature = "crucible-user-getrandom")))]
+#[cfg(all(not(feature = "std"), not(feature = "host-getrandom")))]
 fn custom_getrandom(buf: &mut [u8]) -> core::result::Result<(), getrandom::Error> {
 	// Zero-fill the buffer
 	// This is safe because:
